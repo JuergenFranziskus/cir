@@ -116,6 +116,7 @@ impl From<BlockID> for BlockTarget {
 
 pub enum Expr {
     Register(RegID),
+    Struct(Vec<Expr>),
     ShortArray(Box<Expr>, u64),
     Array(Vec<Expr>),
     Constant(ConstValue),

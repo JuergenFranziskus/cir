@@ -28,6 +28,15 @@ impl Builder {
         (self.module, self.types)
     }
 
+    pub fn module(&self) -> &Module {
+        &self.module
+    }
+    pub fn module_mut(&mut self) -> &mut Module {
+        &mut self.module
+    }
+    pub fn types(&self) -> &Types {
+        &self.types
+    }
     pub fn types_mut(&mut self) -> &mut Types {
         &mut self.types
     }
@@ -561,6 +570,10 @@ impl Builder {
     fn expr_type(&mut self, e: &Expr) -> Type {
         match e {
             &Expr::Register(id) => self.module[id].reg_type(),
+            Expr::Struct(members) => {
+                let members = members.iter().map(|m| self.expr_type(m)).collect();
+                self.types.make_struct(members).into()
+            }
             &Expr::ShortArray(ref element, length) => {
                 let element_type = self.expr_type(element);
                 self.types.make_array(element_type, length).into()
