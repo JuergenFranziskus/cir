@@ -28,6 +28,10 @@ impl Builder {
         (self.module, self.types)
     }
 
+    pub fn types_mut(&mut self) -> &mut Types {
+        &mut self.types
+    }
+
     pub fn select_block(&mut self, block: BlockID) {
         self.at_block = Some(block);
     }
