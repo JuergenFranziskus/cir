@@ -1,14 +1,19 @@
-use std::ops::{Index, IndexMut};
+use self::{
+    block::{Block, BlockID},
+    function::{FuncID, Function},
+    instruction::Instruction,
+    register::{RegID, Register},
+    variable::{VarID, Variable},
+};
 use crate::types::Type;
-use self::{function::{Function, FuncID}, register::{Register, RegID}, variable::{Variable, VarID}, block::{Block, BlockID}, instruction::Instruction};
+use std::ops::{Index, IndexMut};
 
+pub mod block;
+pub mod calling_convention;
 pub mod function;
+pub mod instruction;
 pub mod register;
 pub mod variable;
-pub mod block;
-pub mod instruction;
-pub mod calling_convention;
-
 
 pub struct Module {
     pub(crate) functions: Vec<Function>,
@@ -26,10 +31,10 @@ impl Module {
         }
     }
 
-
     pub fn add_function(&mut self, name: impl Into<String>, ret_type: impl Into<Type>) -> FuncID {
         let id = FuncID(self.functions.len());
-        self.functions.push(Function::new(id, name.into(), ret_type.into()));
+        self.functions
+            .push(Function::new(id, name.into(), ret_type.into()));
         id
     }
     pub fn start_function_definition(&mut self, fid: FuncID) -> BlockID {
@@ -47,7 +52,8 @@ impl Module {
     }
     pub fn add_parameter(&mut self, fid: FuncID, param_type: impl Into<Type>) -> RegID {
         let id = RegID(self.registers.len());
-        self.registers.push(Register::new(fid, id, param_type.into()));
+        self.registers
+            .push(Register::new(fid, id, param_type.into()));
         self[fid].add_parameter(id);
         id
     }

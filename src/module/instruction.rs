@@ -1,6 +1,8 @@
-use crate::types::{Type, IntegerSize};
-use super::{register::RegID, variable::VarID, function::FuncID, block::BlockID, calling_convention::CallingConvention};
-
+use super::{
+    block::BlockID, calling_convention::CallingConvention, function::FuncID, register::RegID,
+    variable::VarID,
+};
+use crate::types::{IntegerSize, Type};
 
 pub enum Instruction {
     Nop,
@@ -18,7 +20,12 @@ pub enum Instruction {
         target: RegID,
         array_pointer: RegID,
         index: Expr,
-        member_type: Type,
+        element_type: Type,
+    },
+    GetMemberPtr {
+        target: RegID,
+        struct_pointer: RegID,
+        member: u32,
     },
 
     GetVarPointer(RegID, VarID),
@@ -31,7 +38,6 @@ pub enum Instruction {
         pointer: RegID,
         value: Expr,
     },
-
 
     Jump(BlockTarget),
     Branch(Expr, BlockTarget, BlockTarget),
@@ -48,7 +54,6 @@ pub enum Instruction {
     },
     Return(Expr),
 }
-
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum BinaryOp {
@@ -96,7 +101,6 @@ pub enum TestOp {
     BelowEqual,
 }
 
-
 pub struct BlockTarget {
     pub block: BlockID,
     pub parameters: Vec<Expr>,
@@ -109,7 +113,6 @@ impl From<BlockID> for BlockTarget {
         }
     }
 }
-
 
 pub enum Expr {
     Register(RegID),
@@ -166,13 +169,11 @@ impl From<i64> for Expr {
     }
 }
 
-
-
 pub enum ConstValue {
     Poison(Type),
     Unit,
     NullPtr,
-    Integer(i128, IntegerSize)
+    Integer(i128, IntegerSize),
 }
 impl ConstValue {
     pub fn expr_type(&self) -> Type {

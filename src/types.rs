@@ -1,23 +1,36 @@
-use std::{fmt::{Display}, error::Error, ops::Index};
+use self::{
+    array_type::{ArrTypeID, ArrayType},
+    struct_type::{StructType, StructTypeID},
+};
 use crate::util::dedup_list::DedupList;
-use self::{array_type::{ArrTypeID, ArrayType}};
+use std::{error::Error, fmt::Display, ops::Index};
 
 pub mod array_type;
-
+pub mod struct_type;
 
 pub struct Types {
     arrays: DedupList<ArrayType>,
+    structs: DedupList<StructType>,
 }
 impl Types {
     pub fn new() -> Self {
         Self {
             arrays: DedupList::new(),
+            structs: DedupList::new(),
         }
     }
 
     pub fn make_array(&mut self, member: impl Into<Type>, length: impl Into<u64>) -> ArrTypeID {
-        let id = self.arrays.insert(|id| ArrayType::new(id, member.into(), length.into()));
+        let id = self
+            .arrays
+            .insert(|id| ArrayType::new(id, member.into(), length.into()));
         ArrTypeID(id)
+    }
+    pub fn make_struct(&mut self, members: Vec<Type>) -> StructTypeID {
+        let i = self
+            .structs
+            .insert(|i| StructType::new(StructTypeID(i), members));
+        StructTypeID(i)
     }
 }
 impl Index<ArrTypeID> for Types {
@@ -26,7 +39,12 @@ impl Index<ArrTypeID> for Types {
         &self.arrays[index.0]
     }
 }
-
+impl Index<StructTypeID> for Types {
+    type Output = StructType;
+    fn index(&self, index: StructTypeID) -> &Self::Output {
+        &self.structs[index.0]
+    }
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Type {
@@ -35,11 +53,13 @@ pub enum Type {
     Integer(IntegerSize),
     Pointer,
     Array(ArrTypeID),
+    Struct(StructTypeID),
 }
 impl Type {
     pub fn integer<T, E>(size: T) -> Self
-        where T: TryInto<IntegerSize, Error = E>,
-              E: Error
+    where
+        T: TryInto<IntegerSize, Error = E>,
+        E: Error,
     {
         Self::Integer(size.try_into().unwrap())
     }
@@ -69,7 +89,11 @@ impl From<ArrTypeID> for Type {
         Self::Array(value)
     }
 }
-
+impl From<StructTypeID> for Type {
+    fn from(value: StructTypeID) -> Self {
+        Self::Struct(value)
+    }
+}
 
 /// The size of a 'byte' type.
 /// Only powers of two are valid.
@@ -78,7 +102,7 @@ impl From<ArrTypeID> for Type {
 pub struct ByteSize(
     /// The logarithm of the amount of bytes in the byte type.
     /// In other words, the amount of bytes is obtained by taking two to the power of this number.
-    u8
+    u8,
 );
 impl ByteSize {
     pub fn from_bits(bits: usize) -> Self {
@@ -90,10 +114,9 @@ impl ByteSize {
     pub fn from_bytes(bytes: usize) -> Self {
         assert!(bytes > 1 && bytes <= 256);
         let log = bytes.ilog2();
-        Self(log as u8)   
+        Self(log as u8)
     }
 }
-
 
 /// The size of an integer size.
 /// Integers may be between one and 256 bits.
@@ -103,7 +126,7 @@ pub struct IntegerSize(
     /// Stored with an offset of 1.
     /// So, a value of 0 is actually one bit,
     /// a value of 1 is two, etc.
-    u8
+    u8,
 );
 impl IntegerSize {
     pub fn bits(self) -> usize {
@@ -111,9 +134,10 @@ impl IntegerSize {
     }
 }
 impl IntegerSize {
-    pub fn make<I, E>(bits: I) -> Self 
-        where I: TryInto<IntegerSize, Error = E>,
-              E: Error
+    pub fn make<I, E>(bits: I) -> Self
+    where
+        I: TryInto<IntegerSize, Error = E>,
+        E: Error,
     {
         bits.try_into().unwrap()
     }
@@ -124,8 +148,7 @@ impl TryFrom<u8> for IntegerSize {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         if value > 0 {
             Ok(Self(value - 1))
-        }
-        else {
+        } else {
             Err(IntSizeError)
         }
     }
@@ -136,8 +159,7 @@ impl TryFrom<u16> for IntegerSize {
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         if value > 0 && value <= 256 {
             Ok(Self((value - 1) as u8))
-        }
-        else {
+        } else {
             Err(IntSizeError)
         }
     }
@@ -148,8 +170,7 @@ impl TryFrom<u32> for IntegerSize {
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         if value > 0 && value <= 256 {
             Ok(Self((value - 1) as u8))
-        }
-        else {
+        } else {
             Err(IntSizeError)
         }
     }
@@ -160,8 +181,7 @@ impl TryFrom<u64> for IntegerSize {
     fn try_from(value: u64) -> Result<Self, Self::Error> {
         if value > 0 && value <= 256 {
             Ok(Self((value - 1) as u8))
-        }
-        else {
+        } else {
             Err(IntSizeError)
         }
     }
@@ -172,8 +192,7 @@ impl TryFrom<usize> for IntegerSize {
     fn try_from(value: usize) -> Result<Self, Self::Error> {
         if value > 0 && value <= 256 {
             Ok(Self((value - 1) as u8))
-        }
-        else {
+        } else {
             Err(IntSizeError)
         }
     }
@@ -184,8 +203,7 @@ impl TryFrom<i8> for IntegerSize {
     fn try_from(value: i8) -> Result<Self, Self::Error> {
         if value > 0 {
             Ok(Self((value - 1) as u8))
-        }
-        else {
+        } else {
             Err(IntSizeError)
         }
     }
@@ -196,8 +214,7 @@ impl TryFrom<i16> for IntegerSize {
     fn try_from(value: i16) -> Result<Self, Self::Error> {
         if value > 0 && value <= 256 {
             Ok(Self((value - 1) as u8))
-        }
-        else {
+        } else {
             Err(IntSizeError)
         }
     }
@@ -208,8 +225,7 @@ impl TryFrom<i32> for IntegerSize {
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         if value > 0 && value <= 256 {
             Ok(Self((value - 1) as u8))
-        }
-        else {
+        } else {
             Err(IntSizeError)
         }
     }
@@ -220,8 +236,7 @@ impl TryFrom<i64> for IntegerSize {
     fn try_from(value: i64) -> Result<Self, Self::Error> {
         if value > 0 && value <= 256 {
             Ok(Self((value - 1) as u8))
-        }
-        else {
+        } else {
             Err(IntSizeError)
         }
     }
@@ -232,21 +247,20 @@ impl TryFrom<isize> for IntegerSize {
     fn try_from(value: isize) -> Result<Self, Self::Error> {
         if value > 0 && value <= 256 {
             Ok(Self((value - 1) as u8))
-        }
-        else {
+        } else {
             Err(IntSizeError)
         }
     }
 }
 
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct IntSizeError;
 impl Display for IntSizeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Size of an integer type must be between 2 and 255 inclusive")
+        write!(
+            f,
+            "Size of an integer type must be between 2 and 255 inclusive"
+        )
     }
 }
-impl Error for IntSizeError {
-
-}
+impl Error for IntSizeError {}

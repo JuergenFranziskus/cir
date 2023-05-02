@@ -1,6 +1,5 @@
-use crate::types::Type;
 use super::function::FuncID;
-
+use crate::types::Type;
 
 pub struct Variable {
     id: VarID,
@@ -16,7 +15,6 @@ impl Variable {
         }
     }
 
-
     pub fn id(&self) -> VarID {
         self.id
     }
@@ -27,7 +25,6 @@ impl Variable {
         self.var_type
     }
 }
-
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct VarID(pub usize);

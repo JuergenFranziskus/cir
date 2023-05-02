@@ -1,7 +1,5 @@
-use crate::types::Type;
 use super::function::FuncID;
-
-
+use crate::types::Type;
 
 pub struct Register {
     id: RegID,
@@ -30,5 +28,3 @@ impl Register {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct RegID(pub usize);
-
-

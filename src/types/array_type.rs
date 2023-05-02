@@ -1,12 +1,9 @@
-use std::{collections::hash_map::DefaultHasher, hash::{Hash, Hasher}};
-
-use crate::util::dedup_list::DedupItem;
-
 use super::Type;
-
-
-
-
+use crate::util::dedup_list::DedupItem;
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
 
 pub struct ArrayType {
     id: ArrTypeID,
@@ -40,12 +37,9 @@ impl DedupItem for ArrayType {
         hasher.finish()
     }
     fn is_equivalent_to(&self, other: &Self) -> bool {
-        self.member == other.member
-            && self.length == other.length
+        self.member == other.member && self.length == other.length
     }
 }
-
-
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ArrTypeID(pub usize);

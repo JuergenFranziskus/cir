@@ -1,8 +1,8 @@
-use std::{collections::HashSet, iter::once};
+use super::{
+    block::BlockID, calling_convention::CallingConvention, register::RegID, variable::VarID,
+};
 use crate::types::Type;
-use super::{register::RegID, variable::VarID, block::BlockID, calling_convention::CallingConvention};
-
-
+use std::{collections::HashSet, iter::once};
 
 pub struct Function {
     id: FuncID,
@@ -48,7 +48,6 @@ impl Function {
         def.variables.insert(id);
     }
 
-
     pub fn id(&self) -> FuncID {
         self.id
     }
@@ -81,7 +80,6 @@ impl Function {
     }
 }
 
-
 pub struct FunctionDefinition {
     variables: HashSet<VarID>,
     blocks: HashSet<BlockID>,
@@ -99,8 +97,6 @@ impl FunctionDefinition {
     }
 }
 
-
-
 pub struct FunctionParameter {
     register: RegID,
 }
@@ -111,13 +107,9 @@ impl FunctionParameter {
 }
 impl From<RegID> for FunctionParameter {
     fn from(value: RegID) -> Self {
-        Self {
-            register: value,
-        }
+        Self { register: value }
     }
 }
-
-
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FuncID(pub usize);

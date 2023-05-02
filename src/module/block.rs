@@ -1,6 +1,4 @@
-use super::{function::FuncID, register::RegID, instruction::Instruction};
-
-
+use super::{function::FuncID, instruction::Instruction, register::RegID};
 
 pub struct Block {
     id: BlockID,
@@ -36,9 +34,7 @@ impl Block {
     pub fn body(&self) -> &[Instruction] {
         &self.body
     }
-
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct BlockID(pub usize);
-

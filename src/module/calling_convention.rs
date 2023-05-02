@@ -1,5 +1,3 @@
-
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum CallingConvention {
     /// The calling convention used by the C language on the given target.

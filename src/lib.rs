@@ -1,4 +1,8 @@
-pub mod types;
-pub mod module;
+mod builder;
+mod module;
+mod types;
 pub mod util;
-pub mod builder;
+
+pub use builder::*;
+pub use module::*;
+pub use types::*;

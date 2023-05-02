@@ -1,6 +1,15 @@
-use crate::{module::{Module, block::BlockID, function::FuncID, register::RegID, variable::VarID, instruction::{Instruction, Expr, BinaryOp, UnaryOp, TestOp, BlockTarget}, calling_convention::CallingConvention}, types::{Type, Types, IntegerSize}};
-
-
+use crate::{
+    module::{
+        block::BlockID,
+        calling_convention::CallingConvention,
+        function::FuncID,
+        instruction::{BinaryOp, BlockTarget, Expr, Instruction, TestOp, UnaryOp},
+        register::RegID,
+        variable::VarID,
+        Module,
+    },
+    types::{IntegerSize, Type, Types},
+};
 
 pub struct Builder {
     module: Module,
@@ -19,7 +28,6 @@ impl Builder {
         (self.module, self.types)
     }
 
-
     pub fn select_block(&mut self, block: BlockID) {
         self.at_block = Some(block);
     }
@@ -30,7 +38,11 @@ impl Builder {
         self.at_block.map(|b| self.module[b].function())
     }
 
-    pub fn create_function(&mut self, name: impl Into<String>, return_type: impl Into<Type>) -> FuncID {
+    pub fn create_function(
+        &mut self,
+        name: impl Into<String>,
+        return_type: impl Into<Type>,
+    ) -> FuncID {
         self.module.add_function(name, return_type)
     }
     pub fn start_function(&mut self, fid: FuncID) {
@@ -62,7 +74,6 @@ impl Builder {
         let block = self.at_block.unwrap();
         self.module.push_instruction(block, i);
     }
-
 
     pub fn nop(&mut self) {
         self.push_instruction(Instruction::Nop);
@@ -162,7 +173,12 @@ impl Builder {
         assert!(ai == bi);
 
         let target = self.add_register(ai);
-        self.push_instruction(Instruction::BinaryOp(target, BinaryOp::ShiftLogicalRight, a, b));
+        self.push_instruction(Instruction::BinaryOp(
+            target,
+            BinaryOp::ShiftLogicalRight,
+            a,
+            b,
+        ));
         target
     }
     pub fn sar(&mut self, a: impl Into<Expr>, b: impl Into<Expr>) -> RegID {
@@ -175,7 +191,12 @@ impl Builder {
         assert!(ai == bi);
 
         let target = self.add_register(ai);
-        self.push_instruction(Instruction::BinaryOp(target, BinaryOp::ShiftArithmeticRight, a, b));
+        self.push_instruction(Instruction::BinaryOp(
+            target,
+            BinaryOp::ShiftArithmeticRight,
+            a,
+            b,
+        ));
         target
     }
     pub fn and(&mut self, a: impl Into<Expr>, b: impl Into<Expr>) -> RegID {
@@ -423,7 +444,7 @@ impl Builder {
 
         let tt = self.expr_type(&t);
         let target = self.add_register(tt);
-        self.push_instruction(Instruction::Select{
+        self.push_instruction(Instruction::Select {
             target,
             condition: c,
             true_value: t,
@@ -431,7 +452,12 @@ impl Builder {
         });
         target
     }
-    pub fn get_element_ptr(&mut self, arr_ptr: RegID, index: impl Into<Expr>, element_type: impl Into<Type>) -> RegID {
+    pub fn get_element_ptr(
+        &mut self,
+        arr_ptr: RegID,
+        index: impl Into<Expr>,
+        element_type: impl Into<Type>,
+    ) -> RegID {
         let index = index.into();
         let member_type = element_type.into();
 
@@ -440,7 +466,19 @@ impl Builder {
             target,
             array_pointer: arr_ptr,
             index,
-            member_type,
+            element_type: member_type,
+        });
+        target
+    }
+    pub fn get_member_ptr(&mut self, struct_pointer: RegID, member: u32) -> RegID {
+        let Type::Struct(id) = self.module[struct_pointer].reg_type() else { panic!() };
+        let member_type = self.types[id].members()[member as usize];
+
+        let target = self.add_register(member_type);
+        self.push_instruction(Instruction::GetMemberPtr {
+            target,
+            struct_pointer,
+            member,
         });
         target
     }
@@ -448,38 +486,68 @@ impl Builder {
     pub fn get_var_ptr(&mut self, var: VarID) -> RegID {
         let target = self.add_register(Type::Pointer);
         self.push_instruction(Instruction::GetVarPointer(target, var));
-        target   
+        target
     }
     pub fn get_func_ptr(&mut self, func: FuncID) -> RegID {
         let target = self.add_register(Type::Pointer);
         self.push_instruction(Instruction::GetFunctionPointer(target, func));
-        target   
+        target
     }
     pub fn load(&mut self, ptr: RegID, pointee_type: impl Into<Type>) -> RegID {
         let target = self.add_register(pointee_type);
-        self.push_instruction(Instruction::Load { target, pointer: ptr });
+        self.push_instruction(Instruction::Load {
+            target,
+            pointer: ptr,
+        });
         target
     }
     pub fn store(&mut self, ptr: RegID, value: impl Into<Expr>) {
         let value = value.into();
-        self.push_instruction(Instruction::Store { pointer: ptr, value });
+        self.push_instruction(Instruction::Store {
+            pointer: ptr,
+            value,
+        });
     }
 
     pub fn jump(&mut self, target: impl Into<BlockTarget>) {
         self.push_instruction(Instruction::Jump(target.into()));
     }
-    pub fn branch(&mut self, c: impl Into<Expr>, true_branch: impl Into<BlockTarget>, false_branch: impl Into<BlockTarget>) {
-        self.push_instruction(Instruction::Branch(c.into(), true_branch.into(), false_branch.into()));
+    pub fn branch(
+        &mut self,
+        c: impl Into<Expr>,
+        true_branch: impl Into<BlockTarget>,
+        false_branch: impl Into<BlockTarget>,
+    ) {
+        self.push_instruction(Instruction::Branch(
+            c.into(),
+            true_branch.into(),
+            false_branch.into(),
+        ));
     }
     pub fn call(&mut self, func: FuncID, args: Vec<Expr>) -> RegID {
         let ret_type = self.module[func].return_type();
         let target = self.add_register(ret_type);
-        self.push_instruction(Instruction::Call { target, function: func, parameters: args });
+        self.push_instruction(Instruction::Call {
+            target,
+            function: func,
+            parameters: args,
+        });
         target
     }
-    pub fn call_ptr(&mut self, func_ptr: RegID, ret_type: impl Into<Type>, args: Vec<Expr>, convention: CallingConvention) -> RegID {
+    pub fn call_ptr(
+        &mut self,
+        func_ptr: RegID,
+        ret_type: impl Into<Type>,
+        args: Vec<Expr>,
+        convention: CallingConvention,
+    ) -> RegID {
         let target = self.add_register(ret_type);
-        self.push_instruction(Instruction::CallPtr { target, function_ptr: func_ptr, parameters: args, calling_convention: convention });
+        self.push_instruction(Instruction::CallPtr {
+            target,
+            function_ptr: func_ptr,
+            parameters: args,
+            calling_convention: convention,
+        });
         target
     }
     pub fn do_return(&mut self, value: impl Into<Expr>) {
