@@ -2,7 +2,10 @@ use super::{
     block::BlockID, calling_convention::CallingConvention, function::FuncID, register::RegID,
     variable::VarID,
 };
-use crate::types::{IntegerSize, Type};
+use crate::{
+    struct_type::StructTypeID,
+    types::{IntegerSize, Type},
+};
 
 pub enum Instruction {
     Nop,
@@ -36,6 +39,7 @@ pub enum Instruction {
         target: RegID,
         struct_pointer: RegID,
         member: u32,
+        struct_type: StructTypeID,
     },
 
     GetVarPointer(RegID, VarID),

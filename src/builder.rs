@@ -8,6 +8,7 @@ use crate::{
         variable::VarID,
         Module,
     },
+    struct_type::StructTypeID,
     types::{IntegerSize, Type, Types},
 };
 
@@ -510,15 +511,20 @@ impl Builder {
         });
         target
     }
-    pub fn get_member_ptr(&mut self, struct_pointer: RegID, member: u32) -> RegID {
-        let Type::Struct(id) = self.module[struct_pointer].reg_type() else { panic!() };
-        let member_type = self.types[id].members()[member as usize];
+    pub fn get_member_ptr(
+        &mut self,
+        struct_pointer: RegID,
+        member: u32,
+        struct_type: StructTypeID,
+    ) -> RegID {
+        let member_type = self.types[struct_type].members()[member as usize];
 
         let target = self.add_register(member_type);
         self.push_instruction(Instruction::GetMemberPtr {
             target,
             struct_pointer,
             member,
+            struct_type,
         });
         target
     }
