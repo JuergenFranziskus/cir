@@ -5,7 +5,9 @@ use super::{
 use crate::{
     struct_type::StructTypeID,
     types::{IntegerSize, Type},
+    Module, Types,
 };
+use std::fmt::Display;
 
 #[derive(Clone, Debug)]
 pub enum Instruction {
@@ -89,6 +91,27 @@ pub enum BinaryOp {
     Xor,
     XNor,
 }
+impl Display for BinaryOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use BinaryOp::*;
+        match self {
+            Add => write!(f, "add"),
+            Sub => write!(f, "sub"),
+            Mul => write!(f, "mul"),
+            UDiv => write!(f, "udiv"),
+            IDiv => write!(f, "idiv"),
+            ShiftLeft => write!(f, "shl"),
+            ShiftLogicalRight => write!(f, "shr"),
+            ShiftArithmeticRight => write!(f, "sar"),
+            And => write!(f, "and"),
+            Nand => write!(f, "nand"),
+            Or => write!(f, "or"),
+            Nor => write!(f, "nor"),
+            Xor => write!(f, "xor"),
+            XNor => write!(f, "xnor"),
+        }
+    }
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum UnaryOp {
@@ -100,6 +123,21 @@ pub enum UnaryOp {
     ZeroExtend,
     IntToPtr,
     PtrToInt,
+}
+impl Display for UnaryOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use UnaryOp::*;
+        match self {
+            Not => write!(f, "not"),
+            Neg => write!(f, "neg"),
+            Freeze => write!(f, "freeze"),
+            Truncate => write!(f, "trunc"),
+            SignExtend => write!(f, "sext"),
+            ZeroExtend => write!(f, "zext"),
+            IntToPtr => write!(f, "inttoptr"),
+            PtrToInt => write!(f, "ptrtoint"),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -114,6 +152,23 @@ pub enum TestOp {
     Below,
     AboveEqual,
     BelowEqual,
+}
+impl Display for TestOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use TestOp::*;
+        match self {
+            Equal => write!(f, "test.eq"),
+            NotEqual => write!(f, "test.neq"),
+            Greater => write!(f, "test.sgt"),
+            GreaterEqual => write!(f, "test.sge"),
+            Less => write!(f, "test.slt"),
+            LessEqual => write!(f, "test.sle"),
+            Above => write!(f, "test.ugt"),
+            AboveEqual => write!(f, "test.uge"),
+            Below => write!(f, "test.ult"),
+            BelowEqual => write!(f, "test.ule"),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -145,6 +200,27 @@ pub enum Expr {
     ShortArray(Box<Expr>, u64),
     Array(Vec<Expr>),
     Constant(ConstValue),
+}
+impl Expr {
+    pub fn expr_type(&self, module: &Module, types: &mut Types) -> Type {
+        match self {
+            &Expr::Register(id) => module[id].reg_type(),
+            Expr::Struct(members) => {
+                let members = members.iter().map(|m| m.expr_type(module, types)).collect();
+                types.make_struct(members).into()
+            }
+            &Expr::ShortArray(ref element, length) => {
+                let element_type = element.expr_type(module, types);
+                types.make_array(element_type, length).into()
+            }
+            Expr::Array(elements) => {
+                let element_type = elements[0].expr_type(module, types);
+                let length = elements.len() as u64;
+                types.make_array(element_type, length).into()
+            }
+            Expr::Constant(v) => v.expr_type(),
+        }
+    }
 }
 impl From<RegID> for Expr {
     fn from(value: RegID) -> Self {

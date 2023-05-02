@@ -2,7 +2,7 @@ use super::{
     block::BlockID, calling_convention::CallingConvention, register::RegID, variable::VarID,
 };
 use crate::types::Type;
-use std::{collections::HashSet, iter::once};
+use std::{collections::HashSet, fmt::Display, iter::once};
 
 #[derive(Clone, Debug)]
 pub struct Function {
@@ -116,3 +116,8 @@ impl From<RegID> for FunctionParameter {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FuncID(pub usize);
+impl Display for FuncID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "${}", self.0)
+    }
+}

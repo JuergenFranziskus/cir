@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use super::{function::FuncID, instruction::Instruction, register::RegID};
 
 #[derive(Clone, Debug)]
@@ -39,3 +41,8 @@ impl Block {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct BlockID(pub usize);
+impl Display for BlockID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "@{}", self.0)
+    }
+}

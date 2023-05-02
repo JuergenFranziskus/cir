@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use super::function::FuncID;
 use crate::types::Type;
 
@@ -29,3 +31,8 @@ impl Register {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct RegID(pub usize);
+impl Display for RegID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "%{}", self.0)
+    }
+}
