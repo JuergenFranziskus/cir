@@ -7,16 +7,27 @@ use crate::{
     variable::VarID,
     Module, Type, Types,
 };
-use std::io::{self, Write};
+use std::{
+    collections::HashMap,
+    io::{self, Write},
+};
 
 pub struct Printer<'a, O> {
     out: O,
     module: &'a Module,
     types: &'a mut Types,
+    local_regs: HashMap<RegID, RegID>,
+    local_counter: usize,
 }
 impl<'a, O> Printer<'a, O> {
     pub fn new(out: O, module: &'a Module, types: &'a mut Types) -> Self {
-        Self { out, module, types }
+        Self {
+            out,
+            module,
+            types,
+            local_regs: HashMap::new(),
+            local_counter: 0,
+        }
     }
 }
 impl<'a, O: Write> Printer<'a, O> {
@@ -31,6 +42,9 @@ impl<'a, O: Write> Printer<'a, O> {
     }
 
     fn print_function(&mut self, fid: FuncID) -> io::Result<()> {
+        self.local_regs.clear();
+        self.local_counter = 0;
+
         let func = &self.module[fid];
         let name = func.name();
         let ret = func.return_type();
@@ -41,7 +55,8 @@ impl<'a, O: Write> Printer<'a, O> {
             let param_type = self.module[reg].reg_type();
             self.print_type(param_type)?;
 
-            write!(self.out, "{reg}")?;
+            let reg_local = self.make_local(reg);
+            write!(self.out, " {reg_local}")?;
             let last = i == func.parameters().len() - 1;
             if !last {
                 write!(self.out, ", ")?;
@@ -69,11 +84,13 @@ impl<'a, O: Write> Printer<'a, O> {
             for &other in others {
                 let reg_t = self.module[other].reg_type();
                 self.print_type(reg_t)?;
-                write!(self.out, " {other}, ")?;
+                let other_local = self.make_local(other);
+                write!(self.out, " {other_local}, ")?;
             }
             let last_t = self.module[last].reg_type();
             self.print_type(last_t)?;
-            write!(self.out, " {last})")?;
+            let last_local = self.make_local(last);
+            write!(self.out, " {last_local})")?;
         }
         writeln!(self.out, ":")?;
 
@@ -146,6 +163,7 @@ impl<'a, O: Write> Printer<'a, O> {
     }
     fn print_set(&mut self, target: RegID, value: &Expr) -> io::Result<()> {
         let target_t = self.module[target].reg_type();
+        let target = self.make_local(target);
         write!(self.out, "{target} = ")?;
         self.print_type(target_t)?;
         write!(self.out, " ")?;
@@ -154,6 +172,7 @@ impl<'a, O: Write> Printer<'a, O> {
     }
     fn print_binop(&mut self, target: RegID, op: BinaryOp, a: &Expr, b: &Expr) -> io::Result<()> {
         let target_t = self.module[target].reg_type();
+        let target = self.make_local(target);
         write!(self.out, "{target} = {op} ")?;
         self.print_type(target_t)?;
         write!(self.out, " ")?;
@@ -165,6 +184,7 @@ impl<'a, O: Write> Printer<'a, O> {
     }
     fn print_unop(&mut self, target: RegID, op: UnaryOp, a: &Expr) -> io::Result<()> {
         let target_t = self.module[target].reg_type();
+        let target = self.make_local(target);
         write!(self.out, "{target} = {op} ")?;
         self.print_type(target_t)?;
         write!(self.out, " ")?;
@@ -173,6 +193,7 @@ impl<'a, O: Write> Printer<'a, O> {
         Ok(())
     }
     fn print_testop(&mut self, target: RegID, op: TestOp, a: &Expr, b: &Expr) -> io::Result<()> {
+        let target = self.make_local(target);
         write!(self.out, "{target} = {op} ")?;
         let a_t = a.expr_type(self.module, self.types);
         self.print_type(a_t)?;
@@ -184,6 +205,7 @@ impl<'a, O: Write> Printer<'a, O> {
         Ok(())
     }
     fn print_select(&mut self, target: RegID, c: &Expr, t: &Expr, f: &Expr) -> io::Result<()> {
+        let target = self.make_local(target);
         write!(self.out, "{target} = select ")?;
         self.print_expr(c)?;
         write!(self.out, " ")?;
@@ -198,6 +220,7 @@ impl<'a, O: Write> Printer<'a, O> {
     }
     fn print_get_element(&mut self, target: RegID, array: &Expr, index: &Expr) -> io::Result<()> {
         let target_t = self.module[target].reg_type();
+        let target = self.make_local(target);
         write!(self.out, "{target} = getelement ")?;
         self.print_type(target_t)?;
         write!(self.out, " ")?;
@@ -215,6 +238,8 @@ impl<'a, O: Write> Printer<'a, O> {
         index: &Expr,
         el_t: Type,
     ) -> io::Result<()> {
+        let target = self.make_local(target);
+        let ptr = self.make_local(ptr);
         write!(self.out, "{target} = getelementptr ")?;
         self.print_type(el_t)?;
         write!(self.out, " {ptr}, ")?;
@@ -224,6 +249,7 @@ impl<'a, O: Write> Printer<'a, O> {
     }
     fn print_get_member(&mut self, target: RegID, structure: &Expr, index: u32) -> io::Result<()> {
         let target_t = self.module[target].reg_type();
+        let target = self.make_local(target);
         write!(self.out, "{target} = getmember ")?;
         self.print_type(target_t)?;
         write!(self.out, " ")?;
@@ -240,15 +266,17 @@ impl<'a, O: Write> Printer<'a, O> {
         index: u32,
         struct_type: StructTypeID,
     ) -> io::Result<()> {
+        let target = self.make_local(target);
+        let ptr = self.make_local(ptr);
         write!(self.out, "{target} = getmemberptr ")?;
         let member_t = self.types[struct_type].members()[index as usize];
         self.print_type(member_t)?;
-        write!(self.out, " {ptr}, ")?;
-        write!(self.out, ", {index}")?;
+        write!(self.out, " {ptr}, {index}")?;
 
         Ok(())
     }
     fn print_get_var_ptr(&mut self, target: RegID, var: VarID) -> io::Result<()> {
+        let target = self.make_local(target);
         let var_type = self.module[var].var_type();
         write!(self.out, "{target} = getvarptr ")?;
         self.print_type(var_type)?;
@@ -257,11 +285,14 @@ impl<'a, O: Write> Printer<'a, O> {
         Ok(())
     }
     fn print_get_func_ptr(&mut self, target: RegID, func: FuncID) -> io::Result<()> {
+        let target = self.make_local(target);
         write!(self.out, "{target} = getfuncptr {func}")?;
         Ok(())
     }
     fn print_load(&mut self, target: RegID, ptr: RegID) -> io::Result<()> {
         let target_t = self.module[target].reg_type();
+        let target = self.make_local(target);
+        let ptr = self.make_local(ptr);
         write!(self.out, "{target} = load ")?;
         self.print_type(target_t)?;
         write!(self.out, " {ptr}")?;
@@ -269,6 +300,7 @@ impl<'a, O: Write> Printer<'a, O> {
     }
     fn print_store(&mut self, ptr: RegID, value: &Expr) -> io::Result<()> {
         let value_t = value.expr_type(self.module, self.types);
+        let ptr = self.make_local(ptr);
 
         write!(self.out, "store ")?;
         self.print_type(value_t)?;
@@ -294,6 +326,7 @@ impl<'a, O: Write> Printer<'a, O> {
     }
     fn print_call(&mut self, target: RegID, func: FuncID, args: &[Expr]) -> io::Result<()> {
         let target_t = self.module[target].reg_type();
+        let target = self.make_local(target);
         write!(self.out, "{target} = call ")?;
         self.print_type(target_t)?;
 
@@ -311,6 +344,7 @@ impl<'a, O: Write> Printer<'a, O> {
     }
     fn print_call_ptr(&mut self, target: RegID, ptr: RegID, args: &[Expr]) -> io::Result<()> {
         let target_t = self.module[target].reg_type();
+        let target = self.make_local(target);
         write!(self.out, "{target} = call ")?;
         self.print_type(target_t)?;
 
@@ -355,7 +389,10 @@ impl<'a, O: Write> Printer<'a, O> {
     fn print_expr(&mut self, e: &Expr) -> io::Result<()> {
         use Expr::*;
         match e {
-            &Register(id) => write!(self.out, "{id}")?,
+            &Register(id) => {
+                let id = self.make_local(id);
+                write!(self.out, "{id}")?;
+            }
             Array(elements) => {
                 write!(self.out, "[ ")?;
                 if let Some((last, others)) = elements.split_last() {
@@ -398,6 +435,17 @@ impl<'a, O: Write> Printer<'a, O> {
         }
 
         Ok(())
+    }
+
+    fn make_local(&mut self, reg: RegID) -> RegID {
+        if let Some(&reg) = self.local_regs.get(&reg) {
+            reg
+        } else {
+            let id = RegID(self.local_counter);
+            self.local_counter += 1;
+            self.local_regs.insert(reg, id);
+            id
+        }
     }
 
     fn print_type(&mut self, t: Type) -> io::Result<()> {
