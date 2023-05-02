@@ -49,7 +49,6 @@ impl Index<StructTypeID> for Types {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Type {
     Unit,
-    Byte(ByteSize),
     Integer(IntegerSize),
     Pointer,
     Array(ArrTypeID),
@@ -63,20 +62,12 @@ impl Type {
     {
         Self::Integer(size.try_into().unwrap())
     }
-    pub fn byte(size: impl Into<ByteSize>) -> Self {
-        Self::Byte(size.into())
-    }
 
     pub fn is_integer(&self) -> bool {
         matches!(self, Self::Integer(_))
     }
     pub fn is_pointer(&self) -> bool {
         matches!(self, Self::Pointer)
-    }
-}
-impl From<ByteSize> for Type {
-    fn from(value: ByteSize) -> Self {
-        Self::Byte(value)
     }
 }
 impl From<IntegerSize> for Type {
@@ -92,29 +83,6 @@ impl From<ArrTypeID> for Type {
 impl From<StructTypeID> for Type {
     fn from(value: StructTypeID) -> Self {
         Self::Struct(value)
-    }
-}
-
-/// The size of a 'byte' type.
-/// Only powers of two are valid.
-/// A byte type may be between 1 and 256 bytes
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ByteSize(
-    /// The logarithm of the amount of bytes in the byte type.
-    /// In other words, the amount of bytes is obtained by taking two to the power of this number.
-    u8,
-);
-impl ByteSize {
-    pub fn from_bits(bits: usize) -> Self {
-        assert!(bits.is_power_of_two());
-        assert!(bits % 8 == 0);
-        let bytes = bits / 8;
-        Self::from_bytes(bytes)
-    }
-    pub fn from_bytes(bytes: usize) -> Self {
-        assert!(bytes > 1 && bytes <= 256);
-        let log = bytes.ilog2();
-        Self(log as u8)
     }
 }
 

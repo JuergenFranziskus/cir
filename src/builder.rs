@@ -558,9 +558,18 @@ impl Builder {
         self.push_instruction(Instruction::Return(value.into()));
     }
 
-    fn expr_type(&self, e: &Expr) -> Type {
+    fn expr_type(&mut self, e: &Expr) -> Type {
         match e {
             &Expr::Register(id) => self.module[id].reg_type(),
+            &Expr::ShortArray(ref element, length) => {
+                let element_type = self.expr_type(element);
+                self.types.make_array(element_type, length).into()
+            }
+            Expr::Array(elements) => {
+                let element_type = self.expr_type(&elements[0]);
+                let length = elements.len() as u64;
+                self.types.make_array(element_type, length).into()
+            }
             Expr::Constant(v) => v.expr_type(),
         }
     }
