@@ -4,6 +4,7 @@ use super::{
 use crate::types::Type;
 use std::{collections::HashSet, iter::once};
 
+#[derive(Clone, Debug)]
 pub struct Function {
     id: FuncID,
     name: String,
@@ -80,6 +81,7 @@ impl Function {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct FunctionDefinition {
     variables: HashSet<VarID>,
     blocks: HashSet<BlockID>,
@@ -97,6 +99,7 @@ impl FunctionDefinition {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct FunctionParameter {
     register: RegID,
 }

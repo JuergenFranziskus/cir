@@ -7,6 +7,7 @@ use crate::{
     types::{IntegerSize, Type},
 };
 
+#[derive(Clone, Debug)]
 pub enum Instruction {
     Nop,
     Set(RegID, Expr),
@@ -115,6 +116,7 @@ pub enum TestOp {
     BelowEqual,
 }
 
+#[derive(Clone, Debug)]
 pub struct BlockTarget {
     pub block: BlockID,
     pub parameters: Vec<Expr>,
@@ -136,6 +138,7 @@ impl<T: Into<Expr>> From<(BlockID, T)> for BlockTarget {
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum Expr {
     Register(RegID),
     Struct(Vec<Expr>),
@@ -194,6 +197,7 @@ impl From<i64> for Expr {
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum ConstValue {
     Poison(Type),
     Unit,

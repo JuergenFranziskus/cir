@@ -1,5 +1,6 @@
 use super::{function::FuncID, instruction::Instruction, register::RegID};
 
+#[derive(Clone, Debug)]
 pub struct Block {
     id: BlockID,
     function: FuncID,

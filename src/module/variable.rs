@@ -1,6 +1,7 @@
 use super::function::FuncID;
 use crate::types::Type;
 
+#[derive(Clone, Debug)]
 pub struct Variable {
     id: VarID,
     function: FuncID,

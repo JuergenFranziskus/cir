@@ -15,6 +15,7 @@ pub mod instruction;
 pub mod register;
 pub mod variable;
 
+#[derive(Clone, Debug)]
 pub struct Module {
     pub(crate) functions: Vec<Function>,
     pub(crate) registers: Vec<Register>,
