@@ -168,10 +168,7 @@ impl Builder {
         let a = a.into();
         let b = b.into();
         let at = self.expr_type(&a);
-        let bt = self.expr_type(&b);
         let Type::Integer(ai) = at else { panic!() };
-        let Type::Integer(bi) = bt else { panic!() };
-        assert!(ai == bi);
 
         let target = self.add_register(ai);
         self.push_instruction(Instruction::BinaryOp(target, BinaryOp::ShiftLeft, a, b));
@@ -181,10 +178,7 @@ impl Builder {
         let a = a.into();
         let b = b.into();
         let at = self.expr_type(&a);
-        let bt = self.expr_type(&b);
         let Type::Integer(ai) = at else { panic!() };
-        let Type::Integer(bi) = bt else { panic!() };
-        assert!(ai == bi);
 
         let target = self.add_register(ai);
         self.push_instruction(Instruction::BinaryOp(
@@ -199,10 +193,7 @@ impl Builder {
         let a = a.into();
         let b = b.into();
         let at = self.expr_type(&a);
-        let bt = self.expr_type(&b);
         let Type::Integer(ai) = at else { panic!() };
-        let Type::Integer(bi) = bt else { panic!() };
-        assert!(ai == bi);
 
         let target = self.add_register(ai);
         self.push_instruction(Instruction::BinaryOp(
