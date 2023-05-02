@@ -465,6 +465,20 @@ impl Builder {
         });
         target
     }
+    pub fn get_element(&mut self, array: impl Into<Expr>, index: impl Into<Expr>) -> RegID {
+        let array = array.into();
+        let index = index.into();
+        let Type::Array(id) = self.expr_type(&array) else { panic!() };
+        let element_type = self.types[id].member();
+
+        let target = self.add_register(element_type);
+        self.push_instruction(Instruction::GetElement {
+            target,
+            array,
+            index,
+        });
+        target
+    }
     pub fn get_element_ptr(
         &mut self,
         arr_ptr: RegID,
@@ -480,6 +494,19 @@ impl Builder {
             array_pointer: arr_ptr,
             index,
             element_type: member_type,
+        });
+        target
+    }
+    pub fn get_member(&mut self, structure: impl Into<Expr>, member: u32) -> RegID {
+        let structure = structure.into();
+        let Type::Struct(id) = self.expr_type(&structure) else { panic!() };
+        let member_type = self.types[id].members()[member as usize];
+
+        let target = self.add_register(member_type);
+        self.push_instruction(Instruction::GetMember {
+            target,
+            structure,
+            index: member,
         });
         target
     }

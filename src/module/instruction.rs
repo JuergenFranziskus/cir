@@ -16,11 +16,21 @@ pub enum Instruction {
         true_value: Expr,
         false_value: Expr,
     },
+    GetElement {
+        target: RegID,
+        array: Expr,
+        index: Expr,
+    },
     GetElementPtr {
         target: RegID,
         array_pointer: RegID,
         index: Expr,
         element_type: Type,
+    },
+    GetMember {
+        target: RegID,
+        structure: Expr,
+        index: u32,
     },
     GetMemberPtr {
         target: RegID,
