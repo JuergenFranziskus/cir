@@ -113,6 +113,14 @@ impl From<BlockID> for BlockTarget {
         }
     }
 }
+impl<T: Into<Expr>> From<(BlockID, T)> for BlockTarget {
+    fn from(value: (BlockID, T)) -> Self {
+        Self {
+            block: value.0,
+            parameters: vec![value.1.into()],
+        }
+    }
+}
 
 pub enum Expr {
     Register(RegID),
