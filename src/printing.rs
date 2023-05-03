@@ -432,6 +432,10 @@ impl<'a, O: Write> Printer<'a, O> {
             Unit => write!(self.out, "()")?,
             NullPtr => write!(self.out, "nullptr")?,
             &Integer(value, _) => write!(self.out, "{value}")?,
+            &SizeOf(t, _) => {
+                write!(self.out, "sizeof ")?;
+                self.print_type(t)?;
+            }
         }
 
         Ok(())

@@ -279,6 +279,7 @@ pub enum ConstValue {
     Unit,
     NullPtr,
     Integer(i128, IntegerSize),
+    SizeOf(Type, IntegerSize),
 }
 impl ConstValue {
     pub fn expr_type(&self) -> Type {
@@ -287,6 +288,7 @@ impl ConstValue {
             &Self::Unit => Type::Unit,
             &Self::NullPtr => Type::Pointer,
             &Self::Integer(_, size) => size.into(),
+            &Self::SizeOf(_, s) => s.into(),
         }
     }
 }
