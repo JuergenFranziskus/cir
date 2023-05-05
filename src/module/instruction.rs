@@ -285,8 +285,8 @@ impl ConstValue {
     pub fn expr_type(&self) -> Type {
         match self {
             &Self::Poison(t) => t,
-            &Self::Unit => Type::Unit,
-            &Self::NullPtr => Type::Pointer,
+            Self::Unit => Type::Unit,
+            Self::NullPtr => Type::Pointer,
             &Self::Integer(_, size) => size.into(),
             &Self::SizeOf(_, s) => s.into(),
         }
