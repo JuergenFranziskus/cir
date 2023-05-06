@@ -535,6 +535,16 @@ impl Builder {
         self.push_instruction(Instruction::Load {
             target,
             pointer: ptr,
+            volatile: false,
+        });
+        target
+    }
+    pub fn load_volatile(&mut self, ptr: RegID, pointee_type: impl Into<Type>) -> RegID {
+        let target = self.add_register(pointee_type);
+        self.push_instruction(Instruction::Load {
+            target,
+            pointer: ptr,
+            volatile: true,
         });
         target
     }
@@ -543,6 +553,15 @@ impl Builder {
         self.push_instruction(Instruction::Store {
             pointer: ptr,
             value,
+            volatile: false,
+        });
+    }
+    pub fn store_volatile(&mut self, ptr: RegID, value: impl Into<Expr>) {
+        let value = value.into();
+        self.push_instruction(Instruction::Store {
+            pointer: ptr,
+            value,
+            volatile: true,
         });
     }
 

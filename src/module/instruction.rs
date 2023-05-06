@@ -50,10 +50,12 @@ pub enum Instruction {
     Load {
         target: RegID,
         pointer: RegID,
+        volatile: bool,
     },
     Store {
         pointer: RegID,
         value: Expr,
+        volatile: bool,
     },
 
     Jump(BlockTarget),

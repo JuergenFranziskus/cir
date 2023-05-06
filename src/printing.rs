@@ -44,6 +44,7 @@ impl<'a, O: Write> Printer<'a, O> {
         for i in 0..max_func {
             let id = FuncID(i);
             self.print_function(id)?;
+            writeln!(self.out)?;
         }
 
         Ok(())
@@ -153,8 +154,16 @@ impl<'a, O: Write> Printer<'a, O> {
             } => self.print_get_member_ptr(target, struct_pointer, member, struct_type)?,
             &GetVarPointer(target, var) => self.print_get_var_ptr(target, var)?,
             &GetFunctionPointer(target, func) => self.print_get_func_ptr(target, func)?,
-            &Load { target, pointer } => self.print_load(target, pointer)?,
-            &Store { pointer, ref value } => self.print_store(pointer, value)?,
+            &Load {
+                target,
+                pointer,
+                volatile,
+            } => self.print_load(target, pointer, volatile)?,
+            &Store {
+                pointer,
+                ref value,
+                volatile,
+            } => self.print_store(pointer, value, volatile)?,
             Jump(block) => self.print_jump(block)?,
             Branch(c, t, f) => self.print_branch(c, t, f)?,
             &Call {
@@ -304,20 +313,28 @@ impl<'a, O: Write> Printer<'a, O> {
         write!(self.out, "{target} = getfuncptr {func}:{func_name}")?;
         Ok(())
     }
-    fn print_load(&mut self, target: RegID, ptr: RegID) -> io::Result<()> {
+    fn print_load(&mut self, target: RegID, ptr: RegID, volatile: bool) -> io::Result<()> {
         let target_t = self.module[target].reg_type();
         let target = self.make_reg_local(target);
         let ptr = self.make_reg_local(ptr);
         write!(self.out, "{target} = load ")?;
+        if volatile {
+            write!(self.out, "volatile ")?;
+        }
+
         self.print_type(target_t)?;
         write!(self.out, " {ptr}")?;
         Ok(())
     }
-    fn print_store(&mut self, ptr: RegID, value: &Expr) -> io::Result<()> {
+    fn print_store(&mut self, ptr: RegID, value: &Expr, volatile: bool) -> io::Result<()> {
         let value_t = value.expr_type(self.module, self.types);
         let ptr = self.make_reg_local(ptr);
 
         write!(self.out, "store ")?;
+        if volatile {
+            write!(self.out, "volatile ")?;
+        }
+
         self.print_type(value_t)?;
         write!(self.out, " ")?;
         self.print_expr(value)?;
