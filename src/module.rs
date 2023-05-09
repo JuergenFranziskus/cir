@@ -52,9 +52,9 @@ impl Module {
     }
     pub fn add_parameter(&mut self, fid: FuncID, param_type: impl Into<Type>) -> RegID {
         let id = RegID(self.registers.len());
-        self.registers
-            .push(Register::new(fid, id, param_type.into()));
-        self[fid].add_parameter(id);
+        let param_type = param_type.into();
+        self.registers.push(Register::new(fid, id, param_type));
+        self[fid].add_parameter(id, param_type);
         id
     }
     pub fn add_variable(&mut self, fid: FuncID, var_type: impl Into<Type>) -> VarID {

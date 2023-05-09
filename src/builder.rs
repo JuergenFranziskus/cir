@@ -1,5 +1,5 @@
 use crate::{
-    function::calling_convention::CallingConvention,
+    function::FunctionSignature,
     module::{
         block::BlockID,
         function::FuncID,
@@ -586,7 +586,7 @@ impl Builder {
         self.push_instruction(Instruction::Call {
             target,
             function: func,
-            parameters: args,
+            args,
         });
         target
     }
@@ -595,16 +595,14 @@ impl Builder {
         func_ptr: RegID,
         ret_type: impl Into<Type>,
         args: Vec<Expr>,
-        calling_convention: CallingConvention,
-        vararg: bool,
+        signature: FunctionSignature,
     ) -> RegID {
         let target = self.add_register(ret_type);
         self.push_instruction(Instruction::CallPtr {
             target,
             function_ptr: func_ptr,
-            convention: calling_convention,
-            potentially_vararg: vararg,
-            parameters: args,
+            args,
+            signature,
         });
         target
     }

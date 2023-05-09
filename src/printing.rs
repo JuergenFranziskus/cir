@@ -63,14 +63,13 @@ impl<'a, O: Write> Printer<'a, O> {
         let ret = func.return_type();
 
         write!(self.out, "fun {fid}:{name} (")?;
-        for (i, param) in func.parameters().iter().enumerate() {
-            let reg = param.register();
+        for (i, &reg) in func.parameter_registers().iter().enumerate() {
             let param_type = self.module[reg].reg_type();
             self.print_type(param_type)?;
 
             let reg_local = self.make_reg_local(reg);
             write!(self.out, " {reg_local}")?;
-            let last = i == func.parameters().len() - 1;
+            let last = i == func.parameters() - 1;
             if !last {
                 write!(self.out, ", ")?;
             }
@@ -169,12 +168,12 @@ impl<'a, O: Write> Printer<'a, O> {
             &Call {
                 target,
                 function,
-                ref parameters,
+                args: ref parameters,
             } => self.print_call(target, function, parameters)?,
             &CallPtr {
                 target,
                 function_ptr,
-                ref parameters,
+                args: ref parameters,
                 ..
             } => self.print_call_ptr(target, function_ptr, parameters)?,
             Return(value) => self.print_return(value)?,

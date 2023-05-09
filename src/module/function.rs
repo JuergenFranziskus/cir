@@ -9,10 +9,8 @@ pub mod calling_convention;
 pub struct Function {
     id: FuncID,
     name: String,
-    calling_convention: CallingConvention,
-    is_vararg: bool,
-    return_type: Type,
-    parameters: Vec<FunctionParameter>,
+    signature: FunctionSignature,
+    parameter_registers: Vec<RegID>,
     registers: HashSet<RegID>,
     definition: Option<FunctionDefinition>,
 }
@@ -21,10 +19,13 @@ impl Function {
         Self {
             id,
             name,
-            calling_convention: CallingConvention::default(),
-            is_vararg: false,
-            return_type,
-            parameters: Vec::new(),
+            signature: FunctionSignature {
+                return_type,
+                parameter_types: Vec::new(),
+                calling_convention: CallingConvention::default(),
+                is_varargs: false,
+            },
+            parameter_registers: Vec::new(),
             registers: HashSet::new(),
             definition: None,
         }
@@ -32,8 +33,9 @@ impl Function {
     pub(super) fn add_register(&mut self, id: RegID) {
         self.registers.insert(id);
     }
-    pub(super) fn add_parameter(&mut self, id: RegID) {
-        self.parameters.push(id.into());
+    pub(super) fn add_parameter(&mut self, id: RegID, param_type: Type) {
+        self.parameter_registers.push(id.into());
+        self.signature.parameter_types.push(param_type);
         self.registers.insert(id);
     }
     pub(super) fn start_definition(&mut self, entry: BlockID) {
@@ -52,13 +54,6 @@ impl Function {
         def.variables.insert(id);
     }
 
-    pub fn set_calling_convention(&mut self, convention: CallingConvention) {
-        self.calling_convention = convention;
-    }
-    pub fn set_vararg(&mut self, is_vararg: bool) {
-        self.is_vararg = is_vararg;
-    }
-
     pub fn id(&self) -> FuncID {
         self.id
     }
@@ -66,16 +61,25 @@ impl Function {
         &self.name
     }
     pub fn is_vararg(&self) -> bool {
-        self.is_vararg
+        self.signature.is_varargs
     }
     pub fn calling_convention(&self) -> CallingConvention {
-        self.calling_convention
+        self.signature.calling_convention
     }
     pub fn return_type(&self) -> Type {
-        self.return_type
+        self.signature.return_type
     }
-    pub fn parameters(&self) -> &[FunctionParameter] {
-        &self.parameters
+    pub fn parameter_types(&self) -> &[Type] {
+        &self.signature.parameter_types
+    }
+    pub fn parameter_registers(&self) -> &[RegID] {
+        &self.parameter_registers
+    }
+    pub fn parameters(&self) -> usize {
+        self.parameter_registers.len()
+    }
+    pub fn signature(&self) -> &FunctionSignature {
+        &self.signature
     }
     pub fn registers(&self) -> &HashSet<RegID> {
         &self.registers
@@ -112,19 +116,12 @@ impl FunctionDefinition {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct FunctionParameter {
-    register: RegID,
-}
-impl FunctionParameter {
-    pub fn register(&self) -> RegID {
-        self.register
-    }
-}
-impl From<RegID> for FunctionParameter {
-    fn from(value: RegID) -> Self {
-        Self { register: value }
-    }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FunctionSignature {
+    pub return_type: Type,
+    pub parameter_types: Vec<Type>,
+    pub calling_convention: CallingConvention,
+    pub is_varargs: bool,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
