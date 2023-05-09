@@ -52,6 +52,13 @@ impl Function {
         def.variables.insert(id);
     }
 
+    pub fn set_calling_convention(&mut self, convention: CallingConvention) {
+        self.calling_convention = convention;
+    }
+    pub fn set_vararg(&mut self, is_vararg: bool) {
+        self.is_vararg = is_vararg;
+    }
+
     pub fn id(&self) -> FuncID {
         self.id
     }
