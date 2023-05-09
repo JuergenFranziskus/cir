@@ -9,7 +9,6 @@ use crate::types::Type;
 use std::ops::{Index, IndexMut};
 
 pub mod block;
-pub mod calling_convention;
 pub mod function;
 pub mod instruction;
 pub mod register;

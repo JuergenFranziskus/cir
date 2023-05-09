@@ -1,7 +1,7 @@
 use crate::{
+    function::calling_convention::CallingConvention,
     module::{
         block::BlockID,
-        calling_convention::CallingConvention,
         function::FuncID,
         instruction::{BinaryOp, BlockTarget, Expr, Instruction, TestOp, UnaryOp},
         register::RegID,
@@ -595,14 +595,14 @@ impl Builder {
         func_ptr: RegID,
         ret_type: impl Into<Type>,
         args: Vec<Expr>,
-        convention: CallingConvention,
     ) -> RegID {
         let target = self.add_register(ret_type);
         self.push_instruction(Instruction::CallPtr {
             target,
             function_ptr: func_ptr,
+            convention: CallingConvention::default(),
+            potentially_vararg: true,
             parameters: args,
-            calling_convention: convention,
         });
         target
     }

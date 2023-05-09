@@ -1,8 +1,6 @@
-use super::{
-    block::BlockID, calling_convention::CallingConvention, function::FuncID, register::RegID,
-    variable::VarID,
-};
+use super::{block::BlockID, function::FuncID, register::RegID, variable::VarID};
 use crate::{
+    function::calling_convention::CallingConvention,
     struct_type::StructTypeID,
     types::{IntegerSize, Type},
     Module, Types,
@@ -67,8 +65,9 @@ pub enum Instruction {
     },
     CallPtr {
         target: RegID,
-        calling_convention: CallingConvention,
         function_ptr: RegID,
+        convention: CallingConvention,
+        potentially_vararg: bool,
         parameters: Vec<Expr>,
     },
     Return(Expr),

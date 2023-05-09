@@ -1,15 +1,17 @@
-use super::{
-    block::BlockID, calling_convention::CallingConvention, register::RegID, variable::VarID,
-};
+use self::calling_convention::CallingConvention;
+use super::{block::BlockID, register::RegID, variable::VarID};
 use crate::types::Type;
 use std::{collections::HashSet, fmt::Display, iter::once};
+
+pub mod calling_convention;
 
 #[derive(Clone, Debug)]
 pub struct Function {
     id: FuncID,
     name: String,
-    return_type: Type,
     calling_convention: CallingConvention,
+    is_vararg: bool,
+    return_type: Type,
     parameters: Vec<FunctionParameter>,
     registers: HashSet<RegID>,
     definition: Option<FunctionDefinition>,
@@ -19,8 +21,9 @@ impl Function {
         Self {
             id,
             name,
-            return_type,
             calling_convention: CallingConvention::default(),
+            is_vararg: false,
+            return_type,
             parameters: Vec::new(),
             registers: HashSet::new(),
             definition: None,
@@ -55,11 +58,14 @@ impl Function {
     pub fn name(&self) -> &str {
         &self.name
     }
-    pub fn return_type(&self) -> Type {
-        self.return_type
+    pub fn is_vararg(&self) -> bool {
+        self.is_vararg
     }
     pub fn calling_convention(&self) -> CallingConvention {
         self.calling_convention
+    }
+    pub fn return_type(&self) -> Type {
+        self.return_type
     }
     pub fn parameters(&self) -> &[FunctionParameter] {
         &self.parameters

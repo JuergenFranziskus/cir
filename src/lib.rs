@@ -1,6 +1,7 @@
 mod builder;
 mod module;
 pub mod printing;
+pub mod target;
 mod types;
 pub mod util;
 
