@@ -233,6 +233,11 @@ impl From<()> for Expr {
         Self::Constant(value.into())
     }
 }
+impl From<bool> for Expr {
+    fn from(value: bool) -> Self {
+        Self::Constant(value.into())
+    }
+}
 impl From<u8> for Expr {
     fn from(value: u8) -> Self {
         Self::Constant(value.into())
@@ -296,6 +301,11 @@ impl ConstValue {
 impl From<()> for ConstValue {
     fn from(_value: ()) -> Self {
         Self::Unit
+    }
+}
+impl From<bool> for ConstValue {
+    fn from(value: bool) -> Self {
+        Self::Integer(value as i128, IntegerSize::make(1))
     }
 }
 impl From<u8> for ConstValue {

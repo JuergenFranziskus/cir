@@ -349,9 +349,9 @@ impl<'a, O: Write> Printer<'a, O> {
     fn print_branch(&mut self, c: &Expr, t: &BlockTarget, f: &BlockTarget) -> io::Result<()> {
         write!(self.out, "branch ")?;
         self.print_expr(c)?;
-        write!(self.out, " ")?;
+        write!(self.out, "\n      ")?;
         self.print_block_target(t)?;
-        write!(self.out, " ")?;
+        write!(self.out, "\n      ")?;
         self.print_block_target(f)?;
 
         Ok(())
