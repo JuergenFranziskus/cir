@@ -9,8 +9,10 @@ pub enum CallingConvention {
     Default,
     /// Use the calling convention used by the C language on the compilation target.
     C,
-    /// Use the calling convention defined by the X86_64 System-V ABI.
+    /// The calling convention defined by the X86_64 System-V ABI.
     SystemV,
+    /// The main calling convention used on the RiscE microprocessor.
+    RiscE,
 }
 impl CallingConvention {
     pub fn supports_varargs(self) -> bool {
@@ -18,6 +20,7 @@ impl CallingConvention {
             Self::Default => false,
             Self::C => true,
             Self::SystemV => true,
+            Self::RiscE => false,
         }
     }
 }
