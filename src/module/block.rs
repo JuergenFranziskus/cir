@@ -1,13 +1,12 @@
-use std::fmt::Display;
-
 use super::{function::FuncID, instruction::Instruction, register::RegID};
+use std::fmt::Display;
 
 #[derive(Clone, Debug)]
 pub struct Block {
-    id: BlockID,
-    function: FuncID,
-    parameters: Vec<RegID>,
-    body: Vec<Instruction>,
+    pub(crate) id: BlockID,
+    pub(crate) function: FuncID,
+    pub(crate) parameters: Vec<RegID>,
+    pub(crate) body: Vec<Instruction>,
 }
 impl Block {
     pub(super) fn new(function: FuncID, id: BlockID) -> Self {
