@@ -209,11 +209,14 @@ impl Builder {
         let b = b.into();
         let at = self.expr_type(&a);
         let bt = self.expr_type(&b);
-        let Type::Integer(ai) = at else { panic!() };
-        let Type::Integer(bi) = bt else { panic!() };
-        assert!(ai == bi);
+        use Type::*;
+        match (at, bt) {
+            (Integer(ai), Integer(bi)) => assert!(ai == bi),
+            (Bool, Bool) => (),
+            _ => panic!(),
+        }
 
-        let target = self.add_register(ai);
+        let target = self.add_register(at);
         self.push_instruction(Instruction::BinaryOp(target, BinaryOp::And, a, b));
         target
     }
@@ -222,11 +225,14 @@ impl Builder {
         let b = b.into();
         let at = self.expr_type(&a);
         let bt = self.expr_type(&b);
-        let Type::Integer(ai) = at else { panic!() };
-        let Type::Integer(bi) = bt else { panic!() };
-        assert!(ai == bi);
+        use Type::*;
+        match (at, bt) {
+            (Integer(ai), Integer(bi)) => assert!(ai == bi),
+            (Bool, Bool) => (),
+            _ => panic!(),
+        }
 
-        let target = self.add_register(ai);
+        let target = self.add_register(at);
         self.push_instruction(Instruction::BinaryOp(target, BinaryOp::Nand, a, b));
         target
     }
@@ -235,11 +241,14 @@ impl Builder {
         let b = b.into();
         let at = self.expr_type(&a);
         let bt = self.expr_type(&b);
-        let Type::Integer(ai) = at else { panic!() };
-        let Type::Integer(bi) = bt else { panic!() };
-        assert!(ai == bi);
+        use Type::*;
+        match (at, bt) {
+            (Integer(ai), Integer(bi)) => assert!(ai == bi),
+            (Bool, Bool) => (),
+            _ => panic!(),
+        }
 
-        let target = self.add_register(ai);
+        let target = self.add_register(at);
         self.push_instruction(Instruction::BinaryOp(target, BinaryOp::Or, a, b));
         target
     }
@@ -248,11 +257,14 @@ impl Builder {
         let b = b.into();
         let at = self.expr_type(&a);
         let bt = self.expr_type(&b);
-        let Type::Integer(ai) = at else { panic!() };
-        let Type::Integer(bi) = bt else { panic!() };
-        assert!(ai == bi);
+        use Type::*;
+        match (at, bt) {
+            (Integer(ai), Integer(bi)) => assert!(ai == bi),
+            (Bool, Bool) => (),
+            _ => panic!(),
+        }
 
-        let target = self.add_register(ai);
+        let target = self.add_register(at);
         self.push_instruction(Instruction::BinaryOp(target, BinaryOp::Nor, a, b));
         target
     }
@@ -261,11 +273,14 @@ impl Builder {
         let b = b.into();
         let at = self.expr_type(&a);
         let bt = self.expr_type(&b);
-        let Type::Integer(ai) = at else { panic!() };
-        let Type::Integer(bi) = bt else { panic!() };
-        assert!(ai == bi);
+        use Type::*;
+        match (at, bt) {
+            (Integer(ai), Integer(bi)) => assert!(ai == bi),
+            (Bool, Bool) => (),
+            _ => panic!(),
+        }
 
-        let target = self.add_register(ai);
+        let target = self.add_register(at);
         self.push_instruction(Instruction::BinaryOp(target, BinaryOp::Xor, a, b));
         target
     }
@@ -274,20 +289,29 @@ impl Builder {
         let b = b.into();
         let at = self.expr_type(&a);
         let bt = self.expr_type(&b);
-        let Type::Integer(ai) = at else { panic!() };
-        let Type::Integer(bi) = bt else { panic!() };
-        assert!(ai == bi);
 
-        let target = self.add_register(ai);
+        use Type::*;
+        match (at, bt) {
+            (Integer(ai), Integer(bi)) => assert!(ai == bi),
+            (Bool, Bool) => (),
+            _ => panic!(),
+        }
+
+        let target = self.add_register(at);
         self.push_instruction(Instruction::BinaryOp(target, BinaryOp::XNor, a, b));
         target
     }
     pub fn not(&mut self, a: impl Into<Expr>) -> RegID {
         let a = a.into();
         let at = self.expr_type(&a);
-        let Type::Integer(ai) = at else { panic!() };
+        use Type::*;
+        match at {
+            Integer(_) => (),
+            Bool => (),
+            _ => panic!(),
+        }
 
-        let target = self.add_register(ai);
+        let target = self.add_register(at);
         self.push_instruction(Instruction::UnaryOp(target, UnaryOp::Not, a));
         target
     }
