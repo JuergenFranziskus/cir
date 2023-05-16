@@ -6,7 +6,6 @@ pub enum Target {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Architecture {
     X86_64,
-    RiscE,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

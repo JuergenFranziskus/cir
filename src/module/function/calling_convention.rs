@@ -11,8 +11,6 @@ pub enum CallingConvention {
     C,
     /// The calling convention defined by the X86_64 System-V ABI.
     SystemV,
-    /// The main calling convention used on the RiscE microprocessor.
-    RiscE,
 }
 impl CallingConvention {
     pub fn supports_varargs(self) -> bool {
@@ -20,7 +18,6 @@ impl CallingConvention {
             Self::Default => false,
             Self::C => true,
             Self::SystemV => true,
-            Self::RiscE => false,
         }
     }
 }

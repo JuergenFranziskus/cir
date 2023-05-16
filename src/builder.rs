@@ -9,7 +9,7 @@ use crate::{
         Module,
     },
     struct_type::StructTypeID,
-    types::{IntegerSize, Type, Types},
+    types::{IntSize, Type, Types},
 };
 
 pub struct Builder {
@@ -308,7 +308,7 @@ impl Builder {
         self.push_instruction(Instruction::UnaryOp(target, UnaryOp::Freeze, a));
         target
     }
-    pub fn trunc(&mut self, a: impl Into<Expr>, to: impl Into<IntegerSize>) -> RegID {
+    pub fn trunc(&mut self, a: impl Into<Expr>, to: impl Into<IntSize>) -> RegID {
         let to = to.into();
         let a = a.into();
         let at = self.expr_type(&a);
@@ -319,7 +319,7 @@ impl Builder {
         self.push_instruction(Instruction::UnaryOp(target, UnaryOp::Truncate, a));
         target
     }
-    pub fn sext(&mut self, a: impl Into<Expr>, to: impl Into<IntegerSize>) -> RegID {
+    pub fn sext(&mut self, a: impl Into<Expr>, to: impl Into<IntSize>) -> RegID {
         let to = to.into();
         let a = a.into();
         let at = self.expr_type(&a);
@@ -330,7 +330,7 @@ impl Builder {
         self.push_instruction(Instruction::UnaryOp(target, UnaryOp::SignExtend, a));
         target
     }
-    pub fn zext(&mut self, a: impl Into<Expr>, to: impl Into<IntegerSize>) -> RegID {
+    pub fn zext(&mut self, a: impl Into<Expr>, to: impl Into<IntSize>) -> RegID {
         let to = to.into();
         let a = a.into();
         let at = self.expr_type(&a);
@@ -350,7 +350,7 @@ impl Builder {
         self.push_instruction(Instruction::UnaryOp(target, UnaryOp::IntToPtr, a));
         target
     }
-    pub fn ptr_to_int(&mut self, a: impl Into<Expr>, to: impl Into<IntegerSize>) -> RegID {
+    pub fn ptr_to_int(&mut self, a: impl Into<Expr>, to: impl Into<IntSize>) -> RegID {
         let to = to.into();
         let a = a.into();
         let at = self.expr_type(&a);
@@ -365,7 +365,7 @@ impl Builder {
         let a = a.into();
         let b = b.into();
 
-        let target = self.add_register(Type::integer(1));
+        let target = self.add_register(Type::Bool);
         self.push_instruction(Instruction::TestOp(target, TestOp::Equal, a, b));
         target
     }
@@ -373,7 +373,7 @@ impl Builder {
         let a = a.into();
         let b = b.into();
 
-        let target = self.add_register(Type::integer(1));
+        let target = self.add_register(Type::Bool);
         self.push_instruction(Instruction::TestOp(target, TestOp::NotEqual, a, b));
         target
     }
@@ -381,7 +381,7 @@ impl Builder {
         let a = a.into();
         let b = b.into();
 
-        let target = self.add_register(Type::integer(1));
+        let target = self.add_register(Type::Bool);
         self.push_instruction(Instruction::TestOp(target, TestOp::Greater, a, b));
         target
     }
@@ -389,7 +389,7 @@ impl Builder {
         let a = a.into();
         let b = b.into();
 
-        let target = self.add_register(Type::integer(1));
+        let target = self.add_register(Type::Bool);
         self.push_instruction(Instruction::TestOp(target, TestOp::GreaterEqual, a, b));
         target
     }
@@ -397,7 +397,7 @@ impl Builder {
         let a = a.into();
         let b = b.into();
 
-        let target = self.add_register(Type::integer(1));
+        let target = self.add_register(Type::Bool);
         self.push_instruction(Instruction::TestOp(target, TestOp::Less, a, b));
         target
     }
@@ -405,7 +405,7 @@ impl Builder {
         let a = a.into();
         let b = b.into();
 
-        let target = self.add_register(Type::integer(1));
+        let target = self.add_register(Type::Bool);
         self.push_instruction(Instruction::TestOp(target, TestOp::LessEqual, a, b));
         target
     }
@@ -413,7 +413,7 @@ impl Builder {
         let a = a.into();
         let b = b.into();
 
-        let target = self.add_register(Type::integer(1));
+        let target = self.add_register(Type::Bool);
         self.push_instruction(Instruction::TestOp(target, TestOp::Above, a, b));
         target
     }
@@ -421,7 +421,7 @@ impl Builder {
         let a = a.into();
         let b = b.into();
 
-        let target = self.add_register(Type::integer(1));
+        let target = self.add_register(Type::Bool);
         self.push_instruction(Instruction::TestOp(target, TestOp::AboveEqual, a, b));
         target
     }
@@ -429,7 +429,7 @@ impl Builder {
         let a = a.into();
         let b = b.into();
 
-        let target = self.add_register(Type::integer(1));
+        let target = self.add_register(Type::Bool);
         self.push_instruction(Instruction::TestOp(target, TestOp::Below, a, b));
         target
     }
@@ -437,8 +437,38 @@ impl Builder {
         let a = a.into();
         let b = b.into();
 
-        let target = self.add_register(Type::integer(1));
+        let target = self.add_register(Type::Bool);
         self.push_instruction(Instruction::TestOp(target, TestOp::BelowEqual, a, b));
+        target
+    }
+
+    pub fn make_struct(&mut self, members: Vec<Expr>) -> RegID {
+        let types = members.iter().map(|m| m.expr_type(&self.module)).collect();
+        let struct_type = self.types.make_struct(types);
+        let target = self.add_register(struct_type);
+
+        self.push_instruction(Instruction::MakeStruct(target, members));
+
+        target
+    }
+    pub fn make_array(&mut self, elements: Vec<Expr>) -> RegID {
+        assert!(!elements.is_empty());
+        let element_type = elements[0].expr_type(&self.module);
+        let length = elements.len() as u64;
+        let array_type = self.types.make_array(element_type, length);
+        let target = self.add_register(array_type);
+
+        self.push_instruction(Instruction::MakeArray(target, elements));
+        target
+    }
+    pub fn make_short_array(&mut self, element: impl Into<Expr>, length: impl Into<u64>) -> RegID {
+        let length = length.into();
+        let element: Expr = element.into();
+        let element_t = element.expr_type(&self.module);
+        let array_type = self.types.make_array(element_t, length);
+        let target = self.add_register(array_type);
+
+        self.push_instruction(Instruction::MakeShortArray(target, element, length));
         target
     }
 
@@ -610,7 +640,7 @@ impl Builder {
         self.push_instruction(Instruction::Return(value.into()));
     }
 
-    fn expr_type(&mut self, e: &Expr) -> Type {
-        e.expr_type(&self.module, &mut self.types)
+    fn expr_type(&self, e: &Expr) -> Type {
+        e.expr_type(&self.module)
     }
 }

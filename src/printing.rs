@@ -123,6 +123,9 @@ impl<'a, O: Write> Printer<'a, O> {
             &BinaryOp(t, op, ref a, ref b) => self.print_binop(t, op, a, b)?,
             &UnaryOp(t, op, ref a) => self.print_unop(t, op, a)?,
             &TestOp(t, op, ref a, ref b) => self.print_testop(t, op, a, b)?,
+            &MakeStruct(t, ref values) => self.print_make_struct(t, values)?,
+            &MakeArray(t, ref values) => self.print_make_array(t, values)?,
+            &MakeShortArray(t, ref value, length) => self.print_make_short_array(t, value, length)?,
             &Select {
                 target,
                 ref condition,
@@ -216,7 +219,7 @@ impl<'a, O: Write> Printer<'a, O> {
     fn print_testop(&mut self, target: RegID, op: TestOp, a: &Expr, b: &Expr) -> io::Result<()> {
         let target = self.make_reg_local(target);
         write!(self.out, "{target} = {op} ")?;
-        let a_t = a.expr_type(self.module, self.types);
+        let a_t = a.expr_type(self.module);
         self.print_type(a_t)?;
         write!(self.out, " ")?;
         self.print_expr(a)?;
@@ -225,12 +228,50 @@ impl<'a, O: Write> Printer<'a, O> {
 
         Ok(())
     }
+    fn print_make_struct(&mut self, target: RegID, values: &[Expr]) -> io::Result<()> {
+        let target = self.make_reg_local(target);
+        write!(self.out, "{target} = struct {{ ")?;
+
+        if let Some((last, others)) = values.split_last() {
+            for other in others {
+                self.print_expr(other)?;
+                write!(self.out, ", ")?;
+            }
+            self.print_expr(last)?;
+        }
+        write!(self.out, " }}")?;
+
+        Ok(())
+    }
+    fn print_make_array(&mut self, target: RegID, values: &[Expr]) -> io::Result<()> {
+        let target = self.make_reg_local(target);
+        write!(self.out, "{target} = array [ ")?;
+
+        if let Some((last, others)) = values.split_last() {
+            for other in others {
+                self.print_expr(other)?;
+                write!(self.out, ", ")?;
+            }
+            self.print_expr(last)?;
+        }
+        write!(self.out, " ]")?;
+
+        Ok(())
+    }
+    fn print_make_short_array(&mut self, target: RegID, value: &Expr, length: u64) -> io::Result<()> {
+        let target = self.make_reg_local(target);
+        write!(self.out, "{target} = array [ ")?;
+        self.print_expr(value)?;
+        write!(self.out, " * {length} ]")?;
+
+        Ok(())
+    }
     fn print_select(&mut self, target: RegID, c: &Expr, t: &Expr, f: &Expr) -> io::Result<()> {
         let target = self.make_reg_local(target);
         write!(self.out, "{target} = select ")?;
         self.print_expr(c)?;
         write!(self.out, " ")?;
-        let a_t = t.expr_type(self.module, self.types);
+        let a_t = t.expr_type(self.module);
         self.print_type(a_t)?;
         write!(self.out, " ")?;
         self.print_expr(t)?;
@@ -326,7 +367,7 @@ impl<'a, O: Write> Printer<'a, O> {
         Ok(())
     }
     fn print_store(&mut self, ptr: RegID, value: &Expr, volatile: bool) -> io::Result<()> {
-        let value_t = value.expr_type(self.module, self.types);
+        let value_t = value.expr_type(self.module);
         let ptr = self.make_reg_local(ptr);
 
         write!(self.out, "store ")?;
@@ -393,7 +434,7 @@ impl<'a, O: Write> Printer<'a, O> {
         Ok(())
     }
     fn print_return(&mut self, value: &Expr) -> io::Result<()> {
-        let value_t = value.expr_type(self.module, self.types);
+        let value_t = value.expr_type(self.module);
         write!(self.out, "return ")?;
         self.print_type(value_t)?;
         write!(self.out, " ")?;
@@ -426,33 +467,6 @@ impl<'a, O: Write> Printer<'a, O> {
                 let id = self.make_reg_local(id);
                 write!(self.out, "{id}")?;
             }
-            Array(elements) => {
-                write!(self.out, "[ ")?;
-                if let Some((last, others)) = elements.split_last() {
-                    for other in others {
-                        self.print_expr(other)?;
-                        write!(self.out, ", ")?;
-                    }
-                    self.print_expr(last)?;
-                }
-                write!(self.out, " ]")?;
-            }
-            &ShortArray(ref element, size) => {
-                write!(self.out, "[ ")?;
-                self.print_expr(element)?;
-                write!(self.out, " * {size} ]")?;
-            }
-            Struct(members) => {
-                write!(self.out, "{{ ")?;
-                if let Some((last, others)) = members.split_last() {
-                    for other in others {
-                        self.print_expr(other)?;
-                        write!(self.out, ", ")?;
-                    }
-                    self.print_expr(last)?;
-                }
-                write!(self.out, " }}")?;
-            }
             Constant(c) => self.print_const_val(c)?,
         }
 
@@ -464,6 +478,7 @@ impl<'a, O: Write> Printer<'a, O> {
             Poison(_) => write!(self.out, "poison")?,
             Unit => write!(self.out, "()")?,
             NullPtr => write!(self.out, "nullptr")?,
+            &Bool(value) => write!(self.out, "{value}")?,
             &Integer(value, _) => write!(self.out, "{value}")?,
             &SizeOf(t, _) => {
                 write!(self.out, "sizeof ")?;
@@ -508,6 +523,7 @@ impl<'a, O: Write> Printer<'a, O> {
     fn print_type(&mut self, t: Type) -> io::Result<()> {
         match t {
             Type::Unit => write!(self.out, "()"),
+            Type::Bool => write!(self.out, "i1"),
             Type::Integer(size) => write!(self.out, "i{}", size.bits()),
             Type::Pointer => write!(self.out, "ptr"),
             Type::Array(id) => {

@@ -206,6 +206,7 @@ impl From<u64> for ConstInt {
         Self::U64(value)
     }
 }
+
 impl AddAssign for ConstInt {
     fn add_assign(&mut self, rhs: Self) {
         use ConstInt::*;

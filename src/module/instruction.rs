@@ -2,8 +2,8 @@ use super::{block::BlockID, function::FuncID, register::RegID, variable::VarID};
 use crate::{
     function::FunctionSignature,
     struct_type::StructTypeID,
-    types::{IntegerSize, Type},
-    Module, Types,
+    types::{IntSize, Type},
+    Module,
 };
 use std::fmt::Display;
 
@@ -14,6 +14,11 @@ pub enum Instruction {
     BinaryOp(RegID, BinaryOp, Expr, Expr),
     UnaryOp(RegID, UnaryOp, Expr),
     TestOp(RegID, TestOp, Expr, Expr),
+
+    MakeStruct(RegID, Vec<Expr>),
+    MakeArray(RegID, Vec<Expr>),
+    MakeShortArray(RegID, Expr, u64),
+
     Select {
         target: RegID,
         condition: Expr,
@@ -196,28 +201,12 @@ impl<T: Into<Expr>> From<(BlockID, T)> for BlockTarget {
 #[derive(Clone, Debug)]
 pub enum Expr {
     Register(RegID),
-    Struct(Vec<Expr>),
-    ShortArray(Box<Expr>, u64),
-    Array(Vec<Expr>),
     Constant(ConstValue),
 }
 impl Expr {
-    pub fn expr_type(&self, module: &Module, types: &mut Types) -> Type {
+    pub fn expr_type(&self, module: &Module) -> Type {
         match self {
             &Expr::Register(id) => module[id].reg_type(),
-            Expr::Struct(members) => {
-                let members = members.iter().map(|m| m.expr_type(module, types)).collect();
-                types.make_struct(members).into()
-            }
-            &Expr::ShortArray(ref element, length) => {
-                let element_type = element.expr_type(module, types);
-                types.make_array(element_type, length).into()
-            }
-            Expr::Array(elements) => {
-                let element_type = elements[0].expr_type(module, types);
-                let length = elements.len() as u64;
-                types.make_array(element_type, length).into()
-            }
             Expr::Constant(v) => v.expr_type(),
         }
     }
@@ -283,8 +272,9 @@ pub enum ConstValue {
     Poison(Type),
     Unit,
     NullPtr,
-    Integer(i128, IntegerSize),
-    SizeOf(Type, IntegerSize),
+    Bool(bool),
+    Integer(i128, IntSize),
+    SizeOf(Type, IntSize),
 }
 impl ConstValue {
     pub fn expr_type(&self) -> Type {
@@ -292,6 +282,7 @@ impl ConstValue {
             &Self::Poison(t) => t,
             Self::Unit => Type::Unit,
             Self::NullPtr => Type::Pointer,
+            &Self::Bool(_) => Type::Bool,
             &Self::Integer(_, size) => size.into(),
             &Self::SizeOf(_, s) => s.into(),
         }
@@ -304,46 +295,46 @@ impl From<()> for ConstValue {
 }
 impl From<bool> for ConstValue {
     fn from(value: bool) -> Self {
-        Self::Integer(value as i128, IntegerSize::make(1))
+        Self::Bool(value)
     }
 }
 impl From<u8> for ConstValue {
     fn from(value: u8) -> Self {
-        Self::Integer(value as i128, IntegerSize::make(8))
+        Self::Integer(value as i128, IntSize::Byte)
     }
 }
 impl From<i8> for ConstValue {
     fn from(value: i8) -> Self {
-        Self::Integer(value as i128, IntegerSize::make(8))
+        Self::Integer(value as i128, IntSize::Byte)
     }
 }
 impl From<u16> for ConstValue {
     fn from(value: u16) -> Self {
-        Self::Integer(value as i128, IntegerSize::make(16))
+        Self::Integer(value as i128, IntSize::Short)
     }
 }
 impl From<i16> for ConstValue {
     fn from(value: i16) -> Self {
-        Self::Integer(value as i128, IntegerSize::make(16))
+        Self::Integer(value as i128, IntSize::Short)
     }
 }
 impl From<u32> for ConstValue {
     fn from(value: u32) -> Self {
-        Self::Integer(value as i128, IntegerSize::make(32))
+        Self::Integer(value as i128, IntSize::Int)
     }
 }
 impl From<i32> for ConstValue {
     fn from(value: i32) -> Self {
-        Self::Integer(value as i128, IntegerSize::make(32))
+        Self::Integer(value as i128, IntSize::Int)
     }
 }
 impl From<u64> for ConstValue {
     fn from(value: u64) -> Self {
-        Self::Integer(value as i128, IntegerSize::make(64))
+        Self::Integer(value as i128, IntSize::Long)
     }
 }
 impl From<i64> for ConstValue {
     fn from(value: i64) -> Self {
-        Self::Integer(value as i128, IntegerSize::make(64))
+        Self::Integer(value as i128, IntSize::Long)
     }
 }
