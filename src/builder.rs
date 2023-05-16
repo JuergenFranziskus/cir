@@ -334,8 +334,12 @@ impl Builder {
         let to = to.into();
         let a = a.into();
         let at = self.expr_type(&a);
-        let Type::Integer(ai) = at else { panic!() };
-        assert!(to > ai);
+
+        match at {
+            Type::Integer(ai) => assert!(to > ai),
+            Type::Bool => (),
+            _ => panic!(),
+        };
 
         let target = self.add_register(to);
         self.push_instruction(Instruction::UnaryOp(target, UnaryOp::ZeroExtend, a));
