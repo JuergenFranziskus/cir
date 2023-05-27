@@ -125,7 +125,9 @@ impl<'a, O: Write> Printer<'a, O> {
             &TestOp(t, op, ref a, ref b) => self.print_testop(t, op, a, b)?,
             &MakeStruct(t, ref values) => self.print_make_struct(t, values)?,
             &MakeArray(t, ref values) => self.print_make_array(t, values)?,
-            &MakeShortArray(t, ref value, length) => self.print_make_short_array(t, value, length)?,
+            &MakeShortArray(t, ref value, length) => {
+                self.print_make_short_array(t, value, length)?
+            }
             &Select {
                 target,
                 ref condition,
@@ -258,7 +260,12 @@ impl<'a, O: Write> Printer<'a, O> {
 
         Ok(())
     }
-    fn print_make_short_array(&mut self, target: RegID, value: &Expr, length: u64) -> io::Result<()> {
+    fn print_make_short_array(
+        &mut self,
+        target: RegID,
+        value: &Expr,
+        length: u64,
+    ) -> io::Result<()> {
         let target = self.make_reg_local(target);
         write!(self.out, "{target} = array [ ")?;
         self.print_expr(value)?;

@@ -11,6 +11,8 @@ pub enum CallingConvention {
     C,
     /// The calling convention defined by the X86_64 System-V ABI.
     SystemV,
+    /// The Easy calling convention that I made up cuz I don't wanna implement the SystemV yet.
+    Easy,
 }
 impl CallingConvention {
     pub fn supports_varargs(self) -> bool {
@@ -18,6 +20,7 @@ impl CallingConvention {
             Self::Default => false,
             Self::C => true,
             Self::SystemV => true,
+            Self::Easy => false,
         }
     }
 }

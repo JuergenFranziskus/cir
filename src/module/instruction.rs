@@ -198,7 +198,7 @@ impl<T: Into<Expr>> From<(BlockID, T)> for BlockTarget {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum Expr {
     Register(RegID),
     Constant(ConstValue),
@@ -267,7 +267,7 @@ impl From<i64> for Expr {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum ConstValue {
     Poison(Type),
     Unit,

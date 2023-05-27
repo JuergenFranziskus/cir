@@ -3,7 +3,8 @@ use self::{
     struct_type::{StructType, StructTypeID},
 };
 use crate::util::dedup_list::DedupList;
-use std::{ops::Index};
+use std::ops::Index;
+use x64_writer::size::Size;
 
 pub mod array_type;
 pub mod struct_type;
@@ -62,6 +63,13 @@ impl Type {
     pub fn is_pointer(&self) -> bool {
         matches!(self, Self::Pointer)
     }
+
+    pub fn is_struct(&self) -> bool {
+        matches!(self, Self::Struct(_))
+    }
+    pub fn is_array(&self) -> bool {
+        matches!(self, Self::Array(_))
+    }
 }
 impl From<IntSize> for Type {
     fn from(value: IntSize) -> Self {
@@ -78,8 +86,6 @@ impl From<StructTypeID> for Type {
         Self::Struct(value)
     }
 }
-
-
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum IntSize {
@@ -98,6 +104,15 @@ impl IntSize {
             Self::Short => 2,
             Self::Int => 4,
             Self::Long => 8,
+        }
+    }
+
+    pub fn asm_size(self) -> Size {
+        match self {
+            Self::Byte => Size::Byte,
+            Self::Short => Size::Word,
+            Self::Int => Size::Double,
+            Self::Long => Size::Quad,
         }
     }
 }

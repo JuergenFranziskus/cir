@@ -1,21 +1,44 @@
 use super::args::Memory;
+use crate::{args::ConstInt, size::Size};
 use std::fmt::Display;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Register(pub RegisterName, pub RegisterSize);
+pub struct Register(pub RegisterName, pub Size);
 impl Register {
     pub fn memory(self) -> Memory<'static> {
         Memory::sib().base(self)
+    }
+    pub fn offset(self, offset: impl Into<ConstInt>) -> Memory<'static> {
+        self.memory().offset(offset)
+    }
+    pub fn index(self, index: Register, scale: Size) -> Memory<'static> {
+        self.memory().index(index, scale)
+    }
+
+    pub fn with_size(self, size: Size) -> Self {
+        Self(self.0, size)
+    }
+    pub fn as_byte(self) -> Self {
+        self.with_size(Size::Byte)
+    }
+    pub fn as_word(self) -> Self {
+        self.with_size(Size::Word)
+    }
+    pub fn as_double(self) -> Self {
+        self.with_size(Size::Double)
+    }
+    pub fn as_quad(self) -> Self {
+        self.with_size(Size::Quad)
     }
 }
 impl Display for Register {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let get_affixes = if self.0.is_sandwich() {
-            RegisterSize::sandwich_affixes
+            Size::sandwich_affixes
         } else if self.0.is_pointer() {
-            RegisterSize::pointer_affixes
+            Size::pointer_affixes
         } else if self.0.is_numbered() {
-            RegisterSize::numbered_affixes
+            Size::numbered_affixes
         } else {
             unreachable!()
         };
@@ -89,65 +112,20 @@ impl RegisterName {
         }
     }
 
-    pub fn with_size(self, size: RegisterSize) -> Register {
+    pub fn with_size(self, size: Size) -> Register {
         Register(self, size)
     }
     pub fn byte(self) -> Register {
-        Register(self, RegisterSize::Byte)
+        Register(self, Size::Byte)
     }
     pub fn word(self) -> Register {
-        Register(self, RegisterSize::Word)
+        Register(self, Size::Word)
     }
     pub fn double(self) -> Register {
-        Register(self, RegisterSize::Double)
+        Register(self, Size::Double)
     }
     pub fn quad(self) -> Register {
-        Register(self, RegisterSize::Quad)
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum RegisterSize {
-    Byte,
-    Word,
-    Double,
-    Quad,
-}
-impl RegisterSize {
-    fn sandwich_affixes(self) -> (&'static str, &'static str) {
-        use RegisterSize::*;
-        match self {
-            Byte => ("", "l"),
-            Word => ("", "x"),
-            Double => ("e", "x"),
-            Quad => ("r", "x"),
-        }
-    }
-    fn pointer_affixes(self) -> (&'static str, &'static str) {
-        use RegisterSize::*;
-        match self {
-            Byte => ("", "l"),
-            Word => ("", ""),
-            Double => ("e", ""),
-            Quad => ("r", ""),
-        }
-    }
-    fn numbered_affixes(self) -> (&'static str, &'static str) {
-        use RegisterSize::*;
-        match self {
-            Byte => ("", "b"),
-            Word => ("", "w"),
-            Double => ("", "d"),
-            Quad => ("", ""),
-        }
-    }
-    pub fn in_bytes(self) -> i64 {
-        match self {
-            Self::Byte => 1,
-            Self::Word => 2,
-            Self::Double => 4,
-            Self::Quad => 8,
-        }
+        Register(self, Size::Quad)
     }
 }
 

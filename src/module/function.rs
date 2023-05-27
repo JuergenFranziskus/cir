@@ -23,7 +23,7 @@ impl Function {
                 return_type,
                 parameter_types: Vec::new(),
                 calling_convention: CallingConvention::default(),
-                is_varargs: false,
+                vararg: false,
             },
             parameter_registers: Vec::new(),
             registers: HashSet::new(),
@@ -61,7 +61,7 @@ impl Function {
         &self.name
     }
     pub fn is_vararg(&self) -> bool {
-        self.signature.is_varargs
+        self.signature.vararg
     }
     pub fn calling_convention(&self) -> CallingConvention {
         self.signature.calling_convention
@@ -121,7 +121,7 @@ pub struct FunctionSignature {
     pub return_type: Type,
     pub parameter_types: Vec<Type>,
     pub calling_convention: CallingConvention,
-    pub is_varargs: bool,
+    pub vararg: bool,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]

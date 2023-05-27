@@ -1,7 +1,5 @@
-use super::{
-    label::Label,
-    register::{Register, RegisterSize},
-};
+use super::{label::Label, register::Register};
+use crate::size::Size;
 use std::{fmt::Display, ops::AddAssign};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -12,19 +10,19 @@ pub enum Arg<'a> {
     Memory(Memory<'a>),
 }
 impl<'a> Arg<'a> {
-    pub fn size(&self) -> Option<ArgSize> {
+    pub fn size(&self) -> Option<Size> {
         let size = match self {
             &Self::Register(r) => match r.1 {
-                RegisterSize::Byte => ArgSize::Byte,
-                RegisterSize::Word => ArgSize::Word,
-                RegisterSize::Double => ArgSize::Double,
-                RegisterSize::Quad => ArgSize::Quad,
+                Size::Byte => Size::Byte,
+                Size::Word => Size::Word,
+                Size::Double => Size::Double,
+                Size::Quad => Size::Quad,
             },
             &Self::Int(c) => match c {
-                ConstInt::I8(_) | ConstInt::U8(_) => ArgSize::Byte,
-                ConstInt::I32(_) => ArgSize::Double,
-                ConstInt::U32(_) => ArgSize::Double,
-                ConstInt::I64(_) | ConstInt::U64(_) => ArgSize::Quad,
+                ConstInt::I8(_) | ConstInt::U8(_) => Size::Byte,
+                ConstInt::I16(_) | ConstInt::U16(_) => Size::Word,
+                ConstInt::I32(_) | ConstInt::U32(_) => Size::Double,
+                ConstInt::I64(_) | ConstInt::U64(_) => Size::Quad,
             },
             &Self::Label(_) => return None,
             &Self::Memory(m) => return m.size,
@@ -61,6 +59,16 @@ impl From<i8> for Arg<'_> {
 }
 impl From<u8> for Arg<'_> {
     fn from(value: u8) -> Self {
+        Self::Int(ConstInt::from(value))
+    }
+}
+impl From<i16> for Arg<'_> {
+    fn from(value: i16) -> Self {
+        Self::Int(ConstInt::from(value))
+    }
+}
+impl From<u16> for Arg<'_> {
+    fn from(value: u16) -> Self {
         Self::Int(ConstInt::from(value))
     }
 }
@@ -116,27 +124,11 @@ impl Display for Arg<'_> {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum ArgSize {
-    Byte,
-    Word,
-    Double,
-    Quad,
-}
-impl ArgSize {
-    pub fn suffix(self) -> &'static str {
-        match self {
-            ArgSize::Byte => "b",
-            ArgSize::Word => "w",
-            ArgSize::Double => "l",
-            ArgSize::Quad => "q",
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ConstInt {
     I8(i8),
     U8(u8),
+    I16(i16),
+    U16(u16),
     I32(i32),
     U32(u32),
     I64(i64),
@@ -147,6 +139,8 @@ impl ConstInt {
         match self {
             Self::I8(v) => v == 0,
             Self::U8(v) => v == 0,
+            Self::I16(v) => v == 0,
+            Self::U16(v) => v == 0,
             Self::I32(v) => v == 0,
             Self::U32(v) => v == 0,
             Self::I64(v) => v == 0,
@@ -157,6 +151,8 @@ impl ConstInt {
         match self {
             Self::I8(v) => v < 0,
             Self::U8(_) => false,
+            Self::I16(v) => v < 0,
+            Self::U16(_) => false,
             Self::I32(v) => v < 0,
             Self::U32(_) => false,
             Self::I64(v) => v < 0,
@@ -169,6 +165,8 @@ impl Display for ConstInt {
         match *self {
             Self::I8(v) => write!(f, "{v}"),
             Self::U8(v) => write!(f, "{v}"),
+            Self::I16(v) => write!(f, "{v}"),
+            Self::U16(v) => write!(f, "{v}"),
             Self::I32(v) => write!(f, "{v}"),
             Self::U32(v) => write!(f, "{v}"),
             Self::I64(v) => write!(f, "{v}"),
@@ -184,6 +182,16 @@ impl From<i8> for ConstInt {
 impl From<u8> for ConstInt {
     fn from(value: u8) -> Self {
         Self::U8(value)
+    }
+}
+impl From<i16> for ConstInt {
+    fn from(value: i16) -> Self {
+        Self::I16(value)
+    }
+}
+impl From<u16> for ConstInt {
+    fn from(value: u16) -> Self {
+        Self::U16(value)
     }
 }
 impl From<i32> for ConstInt {
@@ -206,7 +214,6 @@ impl From<u64> for ConstInt {
         Self::U64(value)
     }
 }
-
 impl AddAssign for ConstInt {
     fn add_assign(&mut self, rhs: Self) {
         use ConstInt::*;
@@ -222,7 +229,7 @@ impl AddAssign for ConstInt {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Memory<'a> {
-    pub size: Option<ArgSize>,
+    pub size: Option<Size>,
     pub displacement_label: Option<Label<'a>>,
     pub displacement_constant: Option<ConstInt>,
     pub kind: MemoryKind,
@@ -253,7 +260,7 @@ impl<'a> Memory<'a> {
         m.base = Some(base);
         self
     }
-    pub fn index(mut self, index: Register, scale: Scale) -> Self {
+    pub fn index(mut self, index: Register, scale: Size) -> Self {
         let MemoryKind::Sib(m) = &mut self.kind else { panic!() };
         m.index = Some((index, scale));
         self
@@ -276,7 +283,7 @@ impl<'a> Memory<'a> {
         self.displacement_label = Some(label);
         self
     }
-    pub fn size(mut self, size: ArgSize) -> Self {
+    pub fn size(mut self, size: Size) -> Self {
         self.size = Some(size);
         self
     }
@@ -317,7 +324,7 @@ impl Display for MemoryKind {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SibMemory {
     base: Option<Register>,
-    index: Option<(Register, Scale)>,
+    index: Option<(Register, Size)>,
 }
 impl Display for SibMemory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -332,8 +339,8 @@ impl Display for SibMemory {
 
         if let Some((index, scale)) = self.index {
             write!(f, ", {index}")?;
-            if scale != Scale::One {
-                write!(f, ", {scale}")?;
+            if scale != Size::Byte {
+                write!(f, ", {}", scale.in_bytes())?;
             }
         }
 
@@ -342,23 +349,5 @@ impl Display for SibMemory {
         }
 
         Ok(())
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Scale {
-    One,
-    Two,
-    Four,
-    Eight,
-}
-impl Display for Scale {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::One => write!(f, "1"),
-            Self::Two => write!(f, "2"),
-            Self::Four => write!(f, "4"),
-            Self::Eight => write!(f, "8"),
-        }
     }
 }

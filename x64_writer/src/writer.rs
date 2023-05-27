@@ -1,7 +1,5 @@
-use super::{
-    args::{Arg, ArgSize},
-    label::Label,
-};
+use super::{args::Arg, label::Label};
+use crate::size::Size;
 use std::io::{self, Write};
 
 pub struct AsmWriter<O> {
@@ -55,6 +53,58 @@ impl<O: Write> AsmWriter<O> {
         let suffix = c.suffix();
         writeln!(self.out, "\tcmov{suffix} {src}, {dst}")
     }
+    pub fn build_movsx<'a>(
+        &mut self,
+        dst: impl Into<Arg<'a>>,
+        src: impl Into<Arg<'a>>,
+    ) -> io::Result<()> {
+        let src: Arg = src.into();
+        let dst: Arg = dst.into();
+
+        let src_size = src.size().unwrap();
+        let dst_size = dst.size().unwrap();
+
+        assert!(dst_size > src_size);
+
+        use Size::*;
+        let instr = match (dst_size, src_size) {
+            (Word, Byte) | (Double, Byte) | (Quad, Byte) | (Double, Word) | (Quad, Word) => "movsx",
+            (Quad, Double) => "movsxd",
+            _ => panic!(),
+        };
+
+        let src_suffix = src_size.suffix();
+        let dst_suffix = dst_size.suffix();
+        writeln!(self.out, "\t{instr}{src_suffix}{dst_suffix} {src} {dst}")?;
+        Ok(())
+    }
+    pub fn build_movzx<'a>(
+        &mut self,
+        dst: impl Into<Arg<'a>>,
+        src: impl Into<Arg<'a>>,
+    ) -> io::Result<()> {
+        let src: Arg = src.into();
+        let dst: Arg = dst.into();
+
+        let Arg::Register(dst) = dst else { panic!() };
+
+        let src_size = src.size().unwrap();
+        let dst_size = dst.1;
+
+        assert!(dst_size > src_size);
+
+        use Size::*;
+        match (dst_size, src_size) {
+            (Quad, Double) => self.build_mov(dst.0.double(), src),
+            _ => {
+                let src_suffix = src_size.suffix();
+                let dst_suffix = dst_size.suffix();
+                writeln!(self.out, "\tmovzx{src_suffix}{dst_suffix} {src} {dst}")?;
+                Ok(())
+            }
+        }
+    }
+
     pub fn build_push<'a>(&mut self, src: impl Into<Arg<'a>>) -> io::Result<()> {
         let src: Arg = src.into();
         let suffix = src.size().unwrap().suffix();
@@ -137,6 +187,8 @@ impl<O: Write> AsmWriter<O> {
         dst: impl Into<Arg<'a>>,
         src: impl Into<Arg<'a>>,
     ) -> io::Result<()> {
+        let src = src.into();
+        assert!(src.is_memory());
         self.build_binary_op(BinaryOpSingle::Lea, dst, src)
     }
     pub fn build_cmp<'a>(
@@ -246,6 +298,18 @@ impl<O: Write> AsmWriter<O> {
     pub fn build_ret(&mut self) -> io::Result<()> {
         self.build_nonary_op(NonaryOp::Ret)
     }
+    pub fn build_cwd(&mut self) -> io::Result<()> {
+        self.build_nonary_op(NonaryOp::Cwd)
+    }
+    pub fn build_cdq(&mut self) -> io::Result<()> {
+        self.build_nonary_op(NonaryOp::Cdq)
+    }
+    pub fn build_cqo(&mut self) -> io::Result<()> {
+        self.build_nonary_op(NonaryOp::Cqo)
+    }
+    pub fn build_syscall(&mut self) -> io::Result<()> {
+        self.build_nonary_op(NonaryOp::Syscall)
+    }
 }
 
 pub enum BinaryOp {
@@ -332,11 +396,19 @@ impl UnaryOpSingle {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum NonaryOp {
     Ret,
+    Cwd,
+    Cdq,
+    Cqo,
+    Syscall,
 }
 impl NonaryOp {
     pub fn mnemonic(self) -> &'static str {
         match self {
             Self::Ret => "ret",
+            Self::Cwd => "cwd",
+            Self::Cdq => "cdq",
+            Self::Cqo => "cqo",
+            Self::Syscall => "syscall",
         }
     }
 }
@@ -380,7 +452,7 @@ impl Condition {
     }
 }
 
-fn get_size(a: &Arg, b: &Arg) -> ArgSize {
+fn get_size(a: &Arg, b: &Arg) -> Size {
     match (a.size(), b.size()) {
         (None, None) => panic!(),
         (Some(a), None) | (None, Some(a)) => a,
