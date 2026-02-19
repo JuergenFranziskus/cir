@@ -1,0 +1,3 @@
+[submodule "gen86"]
+	path = gen86
+	url = https://github.com/JuergenFranziskus/gen86.git
