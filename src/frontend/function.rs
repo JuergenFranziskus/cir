@@ -1,8 +1,6 @@
 use std::collections::HashSet;
 
-use crate::{block::BlockID, register::RegID, types::Ty, variable::VarID};
-
-
+use super::{block::BlockID, register::RegID, types::Ty, variable::VarID};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Function {
@@ -28,13 +26,12 @@ impl Function {
             variables: HashSet::new(),
             blocks: HashSet::new(),
             entry_block: None,
-        }        
+        }
     }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FunID(pub(crate) usize);
-
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum CallConvention {

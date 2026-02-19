@@ -1,8 +1,8 @@
 use std::ops::Index;
 
-use crate::{CallConvention, Target};
+use crate::target::Target;
 
-
+use super::CallConvention;
 
 pub struct Types {
     func_types: Vec<FunTy>,
@@ -18,8 +18,17 @@ impl Types {
         }
     }
 
-    pub fn add_func_type(&mut self, call_convention: CallConvention, ret: Ty, params: impl Into<Vec<Ty>>) -> FunTyID {
-        let func_type = FunTy { call_convention, ret, params: params.into() };
+    pub fn add_func_type(
+        &mut self,
+        call_convention: CallConvention,
+        ret: Ty,
+        params: impl Into<Vec<Ty>>,
+    ) -> FunTyID {
+        let func_type = FunTy {
+            call_convention,
+            ret,
+            params: params.into(),
+        };
         let types = &mut self.func_types;
 
         for (i, ty) in types.iter().enumerate() {
@@ -48,18 +57,20 @@ impl Types {
     }
     pub fn add_struct_type(&mut self) -> StructTyID {
         let id = StructTyID(self.struct_types.len());
-        self.struct_types.push(StructTy { members: Vec::new() });
+        self.struct_types.push(StructTy {
+            members: Vec::new(),
+        });
         id
     }
 
-
     pub fn add_struct_member(&mut self, strct: StructTyID, member: Ty) {
         self.struct_types[strct.0].members.push(member);
-    } 
+    }
 
     pub fn layout(&self, ty: Ty, target: Target) -> (u64, u64) {
         assert_eq!(target, Target::LINUX_X64);
         match ty {
+            Ty::Void => (0, 1),
             Ty::Bool => (1, 1),
             Ty::Ptr => (8, 8),
             Ty::Int(IntTy::I8) => (1, 1),
@@ -74,7 +85,7 @@ impl Types {
             Ty::Struct(id) => {
                 let mut size = 0;
                 let mut align = 1;
-                
+
                 for &member in &self[id].members {
                     let (msize, malign) = self.layout(member, target);
                     while size % malign != 0 {
@@ -112,10 +123,9 @@ impl Index<StructTyID> for Types {
     }
 }
 
-
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Ty {
+    Void,
     Bool,
     Ptr,
     Int(IntTy),
@@ -138,7 +148,6 @@ impl From<StructTyID> for Ty {
     }
 }
 
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum IntTy {
     I8,
@@ -146,7 +155,6 @@ pub enum IntTy {
     I32,
     I64,
 }
-
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FunTy {
@@ -158,7 +166,6 @@ pub struct FunTy {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FunTyID(usize);
 
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ArrayTy {
     pub size: u64,
@@ -167,7 +174,6 @@ pub struct ArrayTy {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ArrayTyID(usize);
-
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StructTy {

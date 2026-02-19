@@ -1,4 +1,4 @@
-use crate::{function::FunID, types::Ty};
+use super::{function::FunID, types::Ty};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Register {
@@ -8,11 +8,7 @@ pub struct Register {
 }
 impl Register {
     pub(crate) fn new(id: RegID, func: FunID, ty: Ty) -> Self {
-        Self {
-            id,
-            fun: func,
-            ty,
-        }
+        Self { id, fun: func, ty }
     }
 }
 

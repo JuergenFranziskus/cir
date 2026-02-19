@@ -1,11 +1,19 @@
 use std::ops::Index;
 
-use crate::{block::{Block, BlockID}, function::{CallConvention, FunID, Function}, instruction::Instruction, register::{RegID, Register}, target::Target, types::{ArrayTy, ArrayTyID, FunTy, FunTyID, StructTy, StructTyID, Ty, Types}, variable::{VarID, Variable}};
+use crate::target::Target;
 
+use super::{
+    block::{Block, BlockID},
+    function::{CallConvention, FunID, Function},
+    instruction::Instruction,
+    register::{RegID, Register},
+    types::{ArrayTy, ArrayTyID, FunTy, FunTyID, StructTy, StructTyID, Ty, Types},
+    variable::{VarID, Variable},
+};
 
 pub struct Module {
     types: Types,
-    
+
     target: Target,
     functions: Vec<Function>,
     registers: Vec<Register>,
@@ -31,7 +39,12 @@ impl Module {
         self.target
     }
 
-    pub fn add_fun_ty(&mut self, call_convention: CallConvention, ret: Ty, params: impl Into<Vec<Ty>>) -> FunTyID {
+    pub fn add_fun_ty(
+        &mut self,
+        call_convention: CallConvention,
+        ret: Ty,
+        params: impl Into<Vec<Ty>>,
+    ) -> FunTyID {
         self.types.add_func_type(call_convention, ret, params)
     }
     pub fn add_array_ty(&mut self, size: u64, element: Ty) -> ArrayTyID {
@@ -92,7 +105,6 @@ impl Module {
         self.blocks[block.0].instructions.push(instruction);
     }
 
-
     pub fn functions(&self) -> &[Function] {
         &self.functions
     }
@@ -111,14 +123,14 @@ impl Index<ArrayTyID> for Module {
 }
 impl Index<StructTyID> for Module {
     type Output = StructTy;
-    
+
     fn index(&self, index: StructTyID) -> &Self::Output {
         &self.types[index]
     }
 }
 impl Index<FunID> for Module {
     type Output = Function;
-    
+
     fn index(&self, index: FunID) -> &Self::Output {
         &self.functions[index.0]
     }

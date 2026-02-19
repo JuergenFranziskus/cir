@@ -1,5 +1,4 @@
-use crate::{function::FunID, types::Ty};
-
+use super::{function::FunID, types::Ty};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Variable {
@@ -9,11 +8,7 @@ pub struct Variable {
 }
 impl Variable {
     pub(crate) fn new(id: VarID, fun: FunID, ty: Ty) -> Self {
-        Self {
-            id,
-            fun,
-            ty,
-        }
+        Self { id, fun, ty }
     }
 }
 

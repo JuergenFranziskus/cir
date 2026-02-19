@@ -1,5 +1,3 @@
-
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Target {
     Hosted(Arch, Os),
@@ -10,7 +8,7 @@ impl Target {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Arch {
-    X86_64
+    X86_64,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
