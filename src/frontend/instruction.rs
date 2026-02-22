@@ -1,3 +1,5 @@
+use crate::frontend::Module;
+
 use super::{
     FunTyID, IntTy, StructTyID, Ty, block::BlockID, function::FunID, register::RegID,
     variable::VarID,
@@ -69,7 +71,7 @@ pub enum Instruction {
         index: Value,
     },
 
-    SyscallX86_64 {
+    SyscallLinux64 {
         dst: RegID,
         call_number: Value,
         args: Values,
@@ -176,6 +178,15 @@ impl Value {
         match self {
             Self::Reg(reg) => reg,
             _ => panic!(),
+        }
+    }
+
+    pub fn ty(self, module: &Module) -> Ty {
+        match self {
+            Value::Void => Ty::Void,
+            Value::Bool(_) => Ty::Bool,
+            Value::Int(int_ty, _) => int_ty.into(),
+            Value::Reg(reg_id) => module[reg_id].ty,
         }
     }
 }

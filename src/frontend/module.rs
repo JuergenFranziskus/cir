@@ -1,6 +1,6 @@
 use std::ops::Index;
 
-use crate::target::Target;
+use crate::{layout::TyLayout, target::Target};
 
 use super::{
     block::{Block, BlockID},
@@ -37,6 +37,9 @@ impl Module {
 
     pub fn target(&self) -> Target {
         self.target
+    }
+    pub fn ty_layout(&self, ty: impl Into<Ty>) -> TyLayout {
+        self.types.layout(ty.into(), self.target)
     }
 
     pub fn add_fun_ty(
@@ -79,7 +82,7 @@ impl Module {
         func.parameters.push(reg);
     }
     pub fn add_variable(&mut self, fun: FunID, ty: Ty) -> VarID {
-        let id = VarID(self.registers.len());
+        let id = VarID(self.variables.len());
         self.variables.push(Variable::new(id, fun, ty));
 
         self.functions[fun.0].variables.insert(id);

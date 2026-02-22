@@ -1,6 +1,6 @@
 use std::ops::Index;
 
-use crate::target::Target;
+use crate::{layout::TyLayout, target::Target};
 
 use super::CallConvention;
 
@@ -67,39 +67,23 @@ impl Types {
         self.struct_types[strct.0].members.push(member);
     }
 
-    pub fn layout(&self, ty: Ty, target: Target) -> (u64, u64) {
+    pub fn layout(&self, ty: Ty, target: Target) -> TyLayout {
         assert_eq!(target, Target::LINUX_X64);
         match ty {
-            Ty::Void => (0, 1),
-            Ty::Bool => (1, 1),
-            Ty::Ptr => (8, 8),
-            Ty::Int(IntTy::I8) => (1, 1),
-            Ty::Int(IntTy::I16) => (2, 2),
-            Ty::Int(IntTy::I32) => (4, 4),
-            Ty::Int(IntTy::I64) => (8, 8),
+            Ty::Void => TyLayout::new(0, 1),
+            Ty::Bool => TyLayout::new(1, 1),
+            Ty::Ptr => TyLayout::new(8, 8),
+            Ty::Int(IntTy::I8) => TyLayout::new(1, 1),
+            Ty::Int(IntTy::I16) => TyLayout::new(2, 2),
+            Ty::Int(IntTy::I32) => TyLayout::new(4, 4),
+            Ty::Int(IntTy::I64) => TyLayout::new(8, 8),
             Ty::Array(id) => {
-                let (size, align) = self.layout(self[id].element, target);
+                let (size, align) = self.layout(self[id].element, target).pad_to_align().bytes();
                 let size = size * self[id].size;
-                (size, align)
+                TyLayout::new(size, align)
             }
-            Ty::Struct(id) => {
-                let mut size = 0;
-                let mut align = 1;
-
-                for &member in &self[id].members {
-                    let (msize, malign) = self.layout(member, target);
-                    while size % malign != 0 {
-                        size += 1;
-                    }
-                    size += msize;
-                    align = align.max(malign);
-                }
-
-                while size % align != 0 {
-                    size += 1;
-                }
-
-                (size, align)
+            Ty::Struct(_id) => {
+                todo!()
             }
         }
     }

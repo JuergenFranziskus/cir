@@ -180,7 +180,7 @@ impl<'a, O: Write> Printer<'a, O> {
                 element_ty,
                 index,
             } => self.print_index_array(dst, ptr, element_ty, index)?,
-            SyscallX86_64 {
+            SyscallLinux64 {
                 dst,
                 call_number,
                 ref args,

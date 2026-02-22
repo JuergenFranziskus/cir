@@ -384,7 +384,7 @@ impl Builder {
         dst
     }
 
-    pub fn syscall_x86_64(
+    pub fn syscall_linux64(
         &mut self,
         ty: impl Into<Ty>,
         call_id: impl Into<Value>,
@@ -395,7 +395,7 @@ impl Builder {
         for arg in args.0.iter_mut() {
             *arg = coerce(*arg, IntTy::I64);
         }
-        self.add_instr(Instruction::SyscallX86_64 {
+        self.add_instr(Instruction::SyscallLinux64 {
             dst,
             call_number: call_id.into(),
             args: args.into(),
