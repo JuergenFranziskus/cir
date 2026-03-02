@@ -16,6 +16,8 @@ pub(crate) mod builder;
 
 pub(crate) mod printer;
 
+pub(crate) mod global;
+
 pub use block::*;
 pub use builder::*;
 pub use function::*;
@@ -25,3 +27,4 @@ pub use printer::*;
 pub use register::*;
 pub use types::*;
 pub use variable::*;
+pub use global::*;

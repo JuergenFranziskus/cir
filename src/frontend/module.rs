@@ -1,6 +1,6 @@
 use std::ops::Index;
 
-use crate::{layout::TyLayout, target::Target};
+use crate::{frontend::global::{Global, GlobalID, GlobalValue}, layout::TyLayout, target::Target};
 
 use super::{
     block::{Block, BlockID},
@@ -15,9 +15,12 @@ pub struct Module {
     types: Types,
 
     target: Target,
+    
+    globals: Vec<Global>,
     functions: Vec<Function>,
     registers: Vec<Register>,
     variables: Vec<Variable>,
+
 
     blocks: Vec<Block>,
 }
@@ -27,6 +30,7 @@ impl Module {
             types: Types::new(),
 
             target,
+            globals: Vec::new(),
             functions: Vec::new(),
             registers: Vec::new(),
             variables: Vec::new(),
@@ -40,6 +44,18 @@ impl Module {
     }
     pub fn ty_layout(&self, ty: impl Into<Ty>) -> TyLayout {
         self.types.layout(ty.into(), self.target)
+    }
+    pub fn struct_member_offsets(&self, ty: StructTyID) -> Vec<u64> {
+        let mut layout = TyLayout::new(0, 1);
+        let mut offsets = Vec::with_capacity(self[ty].members.len());
+        for &member in &self[ty].members {
+            let val_layout = self.ty_layout(member);
+            let (new_layout, offset) = layout.extend(val_layout);
+            layout = new_layout;
+            offsets.push(offset);
+        }
+
+        offsets
     }
 
     pub fn add_fun_ty(
@@ -58,6 +74,15 @@ impl Module {
     }
     pub fn add_struct_member(&mut self, strct: StructTyID, member: Ty) {
         self.types.add_struct_member(strct, member);
+    }
+
+    pub fn add_global(&mut self, name: Option<String>, ty: impl Into<Ty>) -> GlobalID {
+        let id = GlobalID(self.globals.len());
+        self.globals.push(Global { id, name, ty: ty.into(), value: None });
+        id
+    }
+    pub fn set_global_value(&mut self, gid: GlobalID, value: GlobalValue) {
+        self.globals[gid.0].value = Some(value);
     }
 
     pub fn add_function(&mut self, name: String, ret_ty: Ty) -> FunID {
@@ -108,6 +133,9 @@ impl Module {
         self.blocks[block.0].instructions.push(instruction);
     }
 
+    pub fn globals(&self) -> &[Global] {
+        &self.globals
+    }
     pub fn functions(&self) -> &[Function] {
         &self.functions
     }

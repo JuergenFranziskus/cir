@@ -82,8 +82,13 @@ impl Types {
                 let size = size * self[id].size;
                 TyLayout::new(size, align)
             }
-            Ty::Struct(_id) => {
-                todo!()
+            Ty::Struct(id) => {
+                let mut layout = TyLayout::new(0, 1);
+                for &member in &self[id].members {
+                    let mem_layout = self.layout(member, target);
+                    (layout, _) = layout.extend(mem_layout);
+                }
+                layout.pad_to_align()
             }
         }
     }

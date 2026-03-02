@@ -1,4 +1,4 @@
-use crate::frontend::Module;
+use crate::frontend::{Module, global::GlobalID};
 
 use super::{
     FunTyID, IntTy, StructTyID, Ty, block::BlockID, function::FunID, register::RegID,
@@ -9,6 +9,7 @@ use super::{
 pub enum Instruction {
     Set(RegID, Value),
     SetFunPtr(RegID, FunID),
+    SetGlobalPtr(RegID, GlobalID),
     SetStruct(RegID, Values),
     SetArray(RegID, Values),
     SetArraySplat(RegID, Value),
@@ -29,6 +30,7 @@ pub enum Instruction {
         dst: RegID,
         ptr: RegID,
     },
+    PtrDiff(RegID, Ty, RegID, RegID),
 
     Jump(JumpTarget),
     Branch(Value, JumpTarget, JumpTarget),
@@ -131,6 +133,13 @@ impl Values {
     pub fn new() -> Self {
         Self(Vec::new())
     }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 impl From<Vec<Value>> for Values {
     fn from(value: Vec<Value>) -> Self {
@@ -163,6 +172,20 @@ impl From<&[RegID]> for Values {
     fn from(value: &[RegID]) -> Self {
         let value: Vec<Value> = value.into_iter().map(|&v| v.into()).collect();
         Self::from(value)
+    }
+}
+impl IntoIterator for Values {
+    type Item = Value;
+    type IntoIter = std::vec::IntoIter<Value>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+impl<'a> IntoIterator for &'a Values {
+    type IntoIter = std::slice::Iter<'a, Value>;
+    type Item = &'a Value;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
     }
 }
 

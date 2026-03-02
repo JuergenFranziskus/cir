@@ -3,7 +3,7 @@ use std::{collections::HashMap, io};
 use gen86::writer::Condition;
 use gen86::{gp_regs::*, mem::Mem, writer::X86Writer};
 use gen86::nasm::NasmWriter;
-use crate::frontend::{BinOp, IntTy, JumpTarget, Ty, UnOp, Value, Values};
+use crate::frontend::{BinOp, FunTyID, Global, GlobalID, GlobalValue, IntTy, JumpTarget, Ty, UnOp, Value, Values};
 use crate::{frontend::{BlockID, FunID, Function, Instruction, Module, RegID, VarID}, layout::TyLayout};
 
 pub struct CodeGen<'a, O> {
@@ -18,6 +18,10 @@ pub struct CodeGen<'a, O> {
 
     local_counter: usize,
     blocks: HashMap<BlockID, String>,    
+
+    internal_counter: usize,
+
+    globals: HashMap<GlobalID, String>,
 }
 impl<'a, O: io::Write> CodeGen<'a, O> {
     pub fn new(module: &'a Module, o: O) -> Self {
@@ -33,10 +37,19 @@ impl<'a, O: io::Write> CodeGen<'a, O> {
 
             local_counter: 0,
             blocks: HashMap::new(),
+
+            internal_counter: 0,
+            globals: HashMap::new(),
         }
     }
 
     pub fn gen_code(mut self) -> io::Result<()> {
+        for global in self.module.globals() {
+            self.gen_global(global)?;
+        }
+
+        self.o.blank()?;
+
         for function in self.module.functions() {
             self.gen_function(function)?;
             self.o.blank()?;
@@ -44,15 +57,41 @@ impl<'a, O: io::Write> CodeGen<'a, O> {
 
         Ok(())
     }
+    fn gen_global(&mut self, global: &Global) -> io::Result<()> {
+        let label = if let Some(label) = &global.name {
+            label.clone()
+        }
+        else {
+            self.make_internal_label()
+        };
+        self.globals.insert(global.id, label.clone());
+
+        if let Some(value) = &global.value {
+            match value {
+                GlobalValue::String(src) => {
+                    self.o.db(&label, &[src.as_bytes()])?;
+                }
+                _ => todo!(),
+            }
+        }
+
+        Ok(())
+    }
+    fn make_internal_label(&mut self) -> String {
+        let id = self.internal_counter;
+        self.internal_counter += 1;
+        format!("_CLEint{id}")
+    }
+
     fn gen_function(&mut self, fun: &Function) -> io::Result<()> {
         if fun.entry_block.is_none() { return Ok(()) };
-        
-        self.o.global(&fun.name)?;
+
         self.o.label(&fun.name)?;
         self.o.push(RBP)?;
         self.o.mov(RBP, RSP)?;
 
         self.init_func();
+        self.register_params(fun.id);
         self.alloc_regs_vars(fun.id)?;
         self.collect_known_ptrs(fun.id);
 
@@ -77,11 +116,23 @@ impl<'a, O: io::Write> CodeGen<'a, O> {
         self.vars.clear();
         self.known_ptrs.clear();
     }
+    fn register_params(&mut self, fid: FunID) {
+        let (_, offsets) = self.get_fid_staging_layout(fid);
+
+        for (&p, offs) in self.module[fid].parameters.iter().zip(offsets) {
+            let mem = RBP.mem() + 16 + offs;
+            self.regs.insert(p, mem);
+        }
+    }
     fn alloc_regs_vars(&mut self, fid: FunID) -> io::Result<()> {
         let mut layout = TyLayout::new(0, 1);
         
         let mut reg_offsets = HashMap::new();
-        for &reg in &self.module[fid].registers {
+        let mut regs: Vec<_> = self.module[fid].registers.iter().copied().collect();
+        regs.sort_by_key(|r| r.0);
+        for reg in regs {
+            if self.regs.contains_key(&reg) { continue; }
+
             let ty = self.module[reg].ty;
             let ty_layout = self.module.ty_layout(ty);
             let (next_layout, offset) = layout.extend(ty_layout);
@@ -90,7 +141,9 @@ impl<'a, O: io::Write> CodeGen<'a, O> {
         }
 
         let mut var_offsets = HashMap::new();
-        for &var in &self.module[fid].variables {
+        let mut vars: Vec<_> = self.module[fid].variables.iter().copied().collect();
+        vars.sort_by_key(|v| v.0);
+        for var in vars {
             let ty = self.module[var].ty;
             let ty_layout = self.module.ty_layout(ty);
             let (next_layout, offset) = layout.extend(ty_layout);
@@ -130,6 +183,31 @@ impl<'a, O: io::Write> CodeGen<'a, O> {
             }
         }
     }
+    fn get_fid_staging_layout(&self, fid: FunID) -> (TyLayout, Vec<i64>) {
+        let fun = &self.module[fid];
+        let params: Vec<_> = fun.parameters.iter().map(|&p| self.module[p].ty).collect();
+        self.get_staging_layout(fun.ret_ty, &params)
+    }
+    fn get_fty_staging_layout(&self, fun_ty: FunTyID) -> (TyLayout, Vec<i64>) {
+        let ty = &self.module[fun_ty];
+        self.get_staging_layout(ty.ret, &ty.params)
+    }
+    fn get_staging_layout(&self, ret: Ty, params: &[Ty]) -> (TyLayout, Vec<i64>) {
+        let mut layout = self.module.ty_layout(ret);
+        let mut offsets = Vec::new();
+
+        for &ty in params {
+            let p_layout = self.module.ty_layout(ty);
+            let (next_layout, offset) = layout.extend(p_layout);
+            layout = next_layout;
+            offsets.push(offset as i64);
+        }
+
+        let layout = layout.align_to(16).pad_to_align();
+        let layout = layout.pad_to_align();
+
+        (layout, offsets)
+    }
 
     fn gen_block(&mut self, bid: BlockID) -> io::Result<()> {
         let name = self.register_block(bid);
@@ -156,27 +234,63 @@ impl<'a, O: io::Write> CodeGen<'a, O> {
     }
 
     fn gen_instr(&mut self, instr: &Instruction) -> io::Result<()> {
+        use Instruction::*;
+
+        let debug = format!("{instr:?}");
+        self.o.comment(&debug)?;
         match *instr {
-            Instruction::Binary(BinOp::Add, dst, a, b) => self.gen_add(dst, a, b)?,
-            Instruction::Binary(BinOp::Sub, dst, a, b) => self.gen_sub(dst, a, b)?,
-            Instruction::Binary(BinOp::UDiv, dst, a, b) => self.gen_udiv(dst, a, b)?,
-            Instruction::Binary(BinOp::UMod, dst, a, b) => self.gen_umod(dst, a, b)?,
-            Instruction::Binary(BinOp::Equal, dst, a, b) => self.gen_test(Condition::E, dst, a, b)?,
-            Instruction::Binary(BinOp::Less, dst, a, b) => self.gen_test(Condition::L, dst, a, b)?,
-            Instruction::Unary(UnOp::Neg, dst, a) => self.gen_neg(dst, a)?,
-            Instruction::Unary(UnOp::Trunc, dst, a) => self.gen_trunc(dst, a)?,
-            Instruction::Select(dst, c, a, b) => self.gen_select(dst, c, a, b)?,
-            Instruction::GetVarAddr(dst, var) => self.gen_get_var_addr(dst, var)?,
-            Instruction::Load { dst, ptr } => self.gen_load(dst, ptr)?,
-            Instruction::Store { ptr, value } => self.gen_store(ptr, value)?,
-            Instruction::Jump(ref tgt) => self.gen_jump(tgt)?,
-            Instruction::Branch(c, ref t, ref f) => self.gen_branch(c, t, f)?,
-            Instruction::Ret(value) => self.gen_ret(value)?,
-            Instruction::IndexArray { dst, ptr, element_ty, index } => self.gen_index_array(dst, ptr, element_ty, index)?,
-            Instruction::SyscallLinux64 { dst, call_number, ref args } => self.gen_syscall_linux64(dst, call_number, args)?,
+            SetGlobalPtr(dst, gid) => self.gen_set_global_ptr(dst, gid)?,
+            SetFunPtr(dst, fid) => self.gen_set_fun_ptr(dst, fid)?,
+            SetStruct(dst, ref values) => self.gen_set_struct(dst, values)?,
+            SetArray(dst, ref values) => self.gen_set_array(dst, values)?,
+            SetArraySplat(dst, value) => self.gen_set_array_splat(dst, value)?,
+            Binary(BinOp::Add, dst, a, b) => self.gen_add(dst, a, b)?,
+            Binary(BinOp::Sub, dst, a, b) => self.gen_sub(dst, a, b)?,
+            Binary(BinOp::UDiv, dst, a, b) => self.gen_udiv(dst, a, b)?,
+            Binary(BinOp::UMod, dst, a, b) => self.gen_umod(dst, a, b)?,
+            Binary(BinOp::IMod, dst, a, b) => self.gen_imod(dst, a, b)?,
+            Binary(BinOp::Equal, dst, a, b) => self.gen_test(Condition::E, dst, a, b)?,
+            Binary(BinOp::NotEqual, dst, a, b) => self.gen_test(Condition::NE, dst, a, b)?,
+            Binary(BinOp::Less, dst, a, b) => self.gen_test(Condition::L, dst, a, b)?,
+            Binary(BinOp::Greater, dst, a, b) => self.gen_test(Condition::G, dst, a, b)?,
+            Binary(BinOp::GreaterEqual, dst, a, b) => self.gen_test(Condition::GE, dst, a, b)?,
+            Binary(BinOp::LessEqual, dst, a, b) => self.gen_test(Condition::LE, dst, a, b)?,
+            Binary(BinOp::Above, dst, a, b) => self.gen_test(Condition::A, dst, a, b)?,
+            Binary(BinOp::AboveEqual, dst, a, b) => self.gen_test(Condition::AE, dst, a, b)?,
+            Binary(BinOp::Below, dst, a, b) => self.gen_test(Condition::B, dst, a, b)?,
+            Binary(BinOp::BelowEqual, dst, a, b) => self.gen_test(Condition::BE, dst, a, b)?,
+            Unary(UnOp::Neg, dst, a) => self.gen_neg(dst, a)?,
+            Unary(UnOp::Sext, dst, a) => self.gen_sext(dst, a)?,
+            Unary(UnOp::Trunc, dst, a) => self.gen_trunc(dst, a)?,
+            Select(dst, c, a, b) => self.gen_select(dst, c, a, b)?,
+            GetVarAddr(dst, var) => self.gen_get_var_addr(dst, var)?,
+            Load { dst, ptr } => self.gen_load(dst, ptr)?,
+            Store { ptr, value } => self.gen_store(ptr, value)?,
+            PtrDiff(dst, ty, a, b) => self.gen_ptrdiff(dst, ty, a, b)?,
+            Jump(ref tgt) => self.gen_jump(tgt)?,
+            Branch(c, ref t, ref f) => self.gen_branch(c, t, f)?,
+            Call(dst, fid, ref args) => self.gen_call(dst, fid, args)?,
+            CallPtr(dst, ptr, fun_ty, ref args) => self.gen_call_ptr(dst, ptr, fun_ty, args)?,
+            Ret(value) => self.gen_ret(value)?,
+            IndexArray { dst, ptr, element_ty, index } => self.gen_index_array(dst, ptr, element_ty, index)?,
+            GetStructMember { dst, strct, index } => self.gen_get_struct_member(dst, strct, index)?,
+            SyscallLinux64 { dst, call_number, ref args } => self.gen_syscall_linux64(dst, call_number, args)?,
             ref or => todo!("Cannot compile {or:?}"),
         }
 
+        Ok(())
+    }
+    fn gen_set_global_ptr(&mut self, dst: RegID, gid: GlobalID) -> io::Result<()> {
+        let label = &self.globals[&gid];
+        self.o.lea(RBX, Mem::new() + label)?;
+        self.place_register_in_reg(dst, RBX)?;
+
+        Ok(())
+    }
+    fn gen_set_fun_ptr(&mut self, dst: RegID, fid: FunID) -> io::Result<()> {
+        let name = &self.module[fid].name;
+        self.o.lea(RBX, Mem::new() + name)?;
+        self.place_register_in_reg(dst, RBX)?;
         Ok(())
     }
     fn gen_add(&mut self, dst: RegID, a: Value, b: Value) -> io::Result<()> {
@@ -216,6 +330,37 @@ impl<'a, O: io::Write> CodeGen<'a, O> {
         self.place_value_in_register(rcx, b)?;
         self.o.div(rcx)?;
         self.place_register_in_reg(dst, rax)?;
+
+        Ok(())
+    }
+    fn gen_imod(&mut self, dst: RegID, a: Value, b: Value) -> io::Result<()> {
+        let Ty::Int(ty) = self.module[dst].ty else { unreachable!() };
+        self.o.xor(EAX, EAX)?;
+        self.o.xor(EDX, EDX)?;
+        self.o.xor(ECX, ECX)?;
+
+        let size = int_rsize(ty);
+        let rax = RAX + size;
+        let rcx = RCX + size;
+        let rdx = RDX + size;
+        self.place_value_in_register(rax, a)?;
+        self.place_value_in_register(rcx, b)?;
+
+        match ty {
+            IntTy::I8 => self.o.movsx(AX, AL)?,
+            IntTy::I16 => self.o.cwd()?,
+            IntTy::I32 => self.o.cdq()?,
+            IntTy::I64 => self.o.cqo()?,
+        }
+        self.o.idiv(rcx)?;
+
+        if ty == IntTy::I8 {
+            self.o.shr(AX, 8)?;
+            self.place_register_in_reg(dst, AL)?;
+        }
+        else {
+            self.place_register_in_reg(dst, rdx)?;
+        }
 
         Ok(())
     }
@@ -266,6 +411,19 @@ impl<'a, O: io::Write> CodeGen<'a, O> {
         self.place_value_in_register(rax, a)?;
         self.o.neg(rax)?;
         self.place_register_in_reg(dst, rax)?;
+
+        Ok(())
+    }
+    fn gen_sext(&mut self, dst: RegID, a: Value) -> io::Result<()> {
+        let Ty::Int(to) = self.module[dst].ty else { panic!() };
+        let Ty::Int(from) = a.ty(self.module) else { panic!() };
+        let from_size = int_rsize(from);
+        let to_size = int_rsize(to);
+        let to = RAX + to_size;
+        let from = RAX + from_size;
+        self.place_value_in_register(from, a)?;
+        self.o.movsx(to, from)?;
+        self.place_register_in_reg(dst, to)?;
 
         Ok(())
     }
@@ -341,19 +499,83 @@ impl<'a, O: io::Write> CodeGen<'a, O> {
         Ok(())
     }
     fn gen_branch(&mut self, c: Value, t: &JumpTarget, f: &JumpTarget) -> io::Result<()> {
-        let take_false = self.make_local_label();
-        
         self.place_value_in_register(AL, c)?;
         self.o.cmp(AL, 0)?;
-        self.o.jcc(Condition::E, &take_false)?;
-        self.prepare_jump(t)?;
-        let name = self.register_block(t.block);
-        self.o.jmp(&name)?;
+        
+        let then_branch = self.register_block(t.block);
+        let else_branch = self.register_block(f.block);
 
-        self.o.label(&take_false)?;
-        self.prepare_jump(f)?;
-        let name = self.register_block(f.block);
-        self.o.jmp(&name)?;
+        match (t.args.is_empty(), f.args.is_empty()) {
+            (false, false) => {
+                let take_false = self.make_local_label();
+                self.o.jcc(Condition::E, &take_false)?;
+                self.prepare_jump(t)?;
+                self.o.jmp(&then_branch)?;
+
+                self.o.label(&take_false)?;
+                self.prepare_jump(f)?;
+                self.o.jmp(&else_branch)?;
+            }
+            (false, true) => {
+                self.o.jcc(Condition::E, &else_branch)?;
+                self.prepare_jump(t)?;
+                self.o.jmp(&then_branch)?;
+            }
+            (true, false) => {
+                self.o.jcc(Condition::NE, &then_branch)?;
+                self.prepare_jump(f)?;
+                self.o.jmp(&else_branch)?;
+            }
+            (true, true) => {
+                self.o.jcc(Condition::E, &else_branch)?;
+                self.o.jmp(&then_branch)?;
+            }
+        }
+
+
+        Ok(())
+    }
+    fn gen_call(&mut self, dst: RegID, fid: FunID, args: &Values) -> io::Result<()> {
+        let (layout, offsets) = self.get_fid_staging_layout(fid);
+
+        let (size, _align) = layout.bytes_signed();
+        self.o.add(RSP, -size)?;
+        self.rsp += -size;
+
+        for (&arg, offs) in args.0.iter().zip(offsets) {
+            let mem = RSP.mem() + offs;
+            self.mov_value_to_mem(mem, arg)?;
+        }
+
+        let name = &self.module[fid].name;
+        self.o.call(name)?;
+        self.mov_mem_to_reg(dst, RSP.mem())?;
+
+        self.o.add(RSP, size)?;
+        self.rsp += size;
+
+
+        Ok(())
+    }
+    fn gen_call_ptr(&mut self, dst: RegID, ptr: RegID, fun_ty: FunTyID, args: &Values) -> io::Result<()> {
+        let (layout, offsets) = self.get_fty_staging_layout(fun_ty);
+
+        let (size, _align) = layout.bytes_signed();
+        self.o.add(RSP, -size)?;
+        self.rsp += -size;
+
+        for (&arg, offs) in args.0.iter().zip(offsets) {
+            let mem = RSP.mem() + offs;
+            self.mov_value_to_mem(mem, arg)?;
+        }
+
+        self.place_value_in_register(RBX, Value::Reg(ptr))?;
+        self.o.call(RBX)?;
+        self.mov_mem_to_reg(dst, RSP.mem())?;
+
+        self.o.add(RSP, size)?;
+        self.rsp += size;
+
 
         Ok(())
     }
@@ -372,8 +594,19 @@ impl<'a, O: io::Write> CodeGen<'a, O> {
         self.o.mov(RBX, ptr_slot)?;
 
         let layout = self.module.ty_layout(elem_ty).pad_to_align();
-        let size = layout.size() as i64;
-        if size != 1 {
+        let size = layout.size();
+        
+        if size == 0 {
+            self.o.xor(EDX, EDX)?;
+        }
+        else if size == 1 {
+
+        }
+        else if size.is_power_of_two() {
+            let shift = size.ilog2();
+            self.o.shl(RDX, shift)?;
+        }
+        else {
             self.o.imul3(RDX, RDX, size)?;
         }
         self.o.add(RBX, RDX)?;
@@ -421,7 +654,80 @@ impl<'a, O: io::Write> CodeGen<'a, O> {
 
         Ok(())
     }
+    fn gen_set_array_splat(&mut self, dst: RegID, value: Value) -> io::Result<()> {
+        let Ty::Array(arr) = self.module[dst].ty else { panic!() };
+        let elem = self.module[arr].element;
+        let layout = self.module.ty_layout(elem);
+        let stride = layout.size() as i64;
 
+        let length = self.module[arr].size as i64;
+        let base = self.regs[&dst];
+
+        for i in 0..length {
+            let offset = i * stride;
+            self.mov_value_to_mem(base + offset, value)?;
+        }
+
+        Ok(())
+    }
+    fn gen_set_array(&mut self, dst: RegID, values: &Values) -> io::Result<()> {
+        let Ty::Array(arr) = self.module[dst].ty else { panic!() };
+        let elem = self.module[arr].element;
+        let layout = self.module.ty_layout(elem);
+        let stride = layout.size() as i64;
+
+        let base = self.regs[&dst];
+
+        for (i, &value) in values.0.iter().enumerate() {
+            let i = i as i64;
+            let offset = i * stride;
+            self.mov_value_to_mem(base + offset, value)?;
+        }
+
+        Ok(())
+    }
+    fn gen_ptrdiff(&mut self, dst: RegID, ty: Ty, a: RegID, b: RegID) -> io::Result<()> {
+        self.place_value_in_register(RAX, a.into())?;
+        self.place_value_in_register(RDX, b.into())?;
+        self.o.sub(RAX, RDX)?;
+
+        let size = self.module.ty_layout(ty).size();
+        if size < 2 {
+            ()
+        }
+        else if size.is_power_of_two() {
+            let shift = size.ilog2();
+            self.o.shr(RAX, shift)?;
+        }
+        else {
+            self.o.xor(EDX, EDX)?;
+            self.o.mov(RCX, size)?;
+            self.o.div(RCX)?;
+        }
+
+        self.place_register_in_reg(dst, RAX)?;
+
+        Ok(())
+    }
+    fn gen_set_struct(&mut self, dst: RegID, values: &Values) -> io::Result<()> {
+        let base = self.regs[&dst];
+
+        let Ty::Struct(sty) = self.module[dst].ty else { panic!() };
+        let offsets = self.module.struct_member_offsets(sty);
+        for (offset, &value) in offsets.into_iter().zip(&values.0) {
+            self.mov_value_to_mem(base + offset, value)?;
+        }
+
+        Ok(())
+    }
+    fn gen_get_struct_member(&mut self, dst: RegID, strct: RegID, index: u64) -> io::Result<()> {
+        let Ty::Struct(sty) = self.module[strct].ty else { panic!() };
+        let offsets = self.module.struct_member_offsets(sty);
+        let offset = offsets[index as usize];
+        let mem = self.regs[&strct] + offset;
+        self.mov_mem_to_reg(dst, mem)?;
+        Ok(())
+    }
 
     fn place_value_in_register(&mut self, to: Reg, value: Value) -> io::Result<()> {
         match value {
@@ -462,14 +768,6 @@ impl<'a, O: io::Write> CodeGen<'a, O> {
         self.memcpy(to, slot, layout)?;
         Ok(())
     }
-    fn mov_reg_to_reg(&mut self, to: RegID, from: RegID) -> io::Result<()> {
-        let ty = self.module[to].ty;
-        let layout = self.module.ty_layout(ty);
-        let to_slot = self.regs[&to];
-        let from_slot = self.regs[&from];
-        self.memcpy(to_slot, from_slot, layout)?;
-        Ok(())
-    }
     fn mov_value_to_reg(&mut self, to: RegID, value: Value) -> io::Result<()> {
         let slot = self.regs[&to];
         self.mov_value_to_mem(slot, value)?;
@@ -499,6 +797,12 @@ impl<'a, O: io::Write> CodeGen<'a, O> {
         if size == 0 { return Ok(()) };
         let slot = self.regs[&to];
         self.o.mov(slot, from)?;
+        Ok(())
+    }
+    fn mov_mem_to_reg(&mut self, to: RegID, from: Mem) -> io::Result<()> {
+        let layout = self.module.ty_layout(self.module[to].ty);
+        let slot = self.regs[&to];
+        self.memcpy(slot, from, layout)?;
         Ok(())
     }
 

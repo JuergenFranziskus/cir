@@ -3,6 +3,8 @@ use std::{
     io::{self, Write},
 };
 
+use crate::frontend::global::{Global, GlobalID, GlobalValue};
+
 use super::*;
 
 pub struct Printer<'a, O> {
@@ -26,9 +28,45 @@ impl<'a, O: Write> Printer<'a, O> {
     }
 
     pub fn print(&mut self) -> io::Result<()> {
+        for glob in self.module.globals() {
+            self.print_global(glob)?;
+        }
+
+        writeln!(self.out, "\n\n")?;
+
         for fun in self.module.functions() {
             self.print_function(fun)?;
             writeln!(self.out)?;
+        }
+
+        Ok(())
+    }
+
+    fn print_global(&mut self, global: &Global) -> io::Result<()> {
+        self.print_global_id(global.id)?;
+        write!(self.out, " ")?;
+        write!(self.out, " = global ")?;
+        self.print_ty(global.ty)?;
+        if let Some(name) = &global.name {
+            write!(self.out, " {name}")?;
+        }
+
+        if let Some(value) = &global.value {
+            write!(self.out, " ")?;
+            self.print_global_value(value)?;
+        }
+        writeln!(self.out)?;
+
+        Ok(())
+    }
+    fn print_global_value(&mut self, value: &GlobalValue) -> io::Result<()> {
+        match value {
+            GlobalValue::Int(value) => write!(self.out, "{value}")?,
+            GlobalValue::Bool(value) => write!(self.out, "{value}")?,
+            GlobalValue::String(src) => {
+                let src = src.escape_default();
+                write!(self.out, "\"{src}\"")?;
+            }
         }
 
         Ok(())
@@ -41,8 +79,6 @@ impl<'a, O: Write> Printer<'a, O> {
         self.print_ty(fun.ret_ty)?;
         write!(self.out, "( ")?;
         for (i, &param) in fun.parameters.iter().enumerate() {
-            self.print_ty(self.module[param].ty)?;
-            write!(self.out, " ")?;
             self.print_reg(param)?;
             if i != fun.parameters.len() - 1 {
                 write!(self.out, ", ")?;
@@ -106,6 +142,7 @@ impl<'a, O: Write> Printer<'a, O> {
         write!(self.out, "    ")?;
         match *instr {
             Set(dst, to) => self.print_set(dst, to)?,
+            SetGlobalPtr(dst, gid) => self.print_set_global_ptr(dst, gid)?,
             SetFunPtr(dst, fid) => self.print_set_fun_ptr(dst, fid)?,
             SetStruct(dst, ref values) => self.print_set_struct(dst, values)?,
             SetArray(dst, ref values) => self.print_set_array(dst, values)?,
@@ -185,6 +222,8 @@ impl<'a, O: Write> Printer<'a, O> {
                 call_number,
                 ref args,
             } => self.print_syscall_x86_64(dst, call_number, &args)?,
+            GetStructMember { dst, strct, index } => self.print_get_struct_member(dst, strct, index)?,
+            PtrDiff(dst, ty, a, b) => self.print_ptr_diff(dst, ty, a, b)?,
             ref or => write!(self.out, "UNPRINTABLE {or:?}")?,
         }
 
@@ -197,6 +236,12 @@ impl<'a, O: Write> Printer<'a, O> {
         self.print_value(to)?;
         Ok(())
     }
+    fn print_set_global_ptr(&mut self, dst: RegID, gid: GlobalID) -> io::Result<()> {
+        self.print_assign(dst)?;
+        self.print_global_id(gid)?;
+
+        Ok(())
+    }
     fn print_set_fun_ptr(&mut self, dst: RegID, fid: FunID) -> io::Result<()> {
         self.print_assign(dst)?;
         let name = &self.module[fid].name;
@@ -205,7 +250,7 @@ impl<'a, O: Write> Printer<'a, O> {
     }
     fn print_set_struct(&mut self, dst: RegID, values: &Values) -> io::Result<()> {
         self.print_assign(dst)?;
-        self.print_values("{{ ", values, " }}")?;
+        self.print_values("{ ", values, " }")?;
         Ok(())
     }
     fn print_set_array(&mut self, dst: RegID, values: &Values) -> io::Result<()> {
@@ -312,6 +357,26 @@ impl<'a, O: Write> Printer<'a, O> {
 
         Ok(())
     }
+    fn print_get_struct_member(&mut self, dst: RegID, strct: RegID, index: u64) -> io::Result<()> {
+        self.print_assign(dst)?;
+
+        write!(self.out, "get_struct_member ")?;
+        self.print_reg(strct)?;
+        write!(self.out, ", {index}")?;
+
+        Ok(())
+    }
+    fn print_ptr_diff(&mut self, dst: RegID, ty: Ty, a: RegID, b: RegID) -> io::Result<()> {
+        self.print_assign(dst)?;
+        write!(self.out, "ptrdiff ")?;
+        self.print_ty(ty)?;
+        write!(self.out, " ")?;
+        self.print_reg(a)?;
+        write!(self.out, ", ")?;
+        self.print_reg(b)?;
+
+        Ok(())
+    }
 
     fn print_assign(&mut self, dst: RegID) -> io::Result<()> {
         self.print_reg(dst)?;
@@ -404,6 +469,12 @@ impl<'a, O: Write> Printer<'a, O> {
 
         Ok(())
     }
+    fn print_global_id(&mut self, global: GlobalID) -> io::Result<()> {
+        let id = global.0;
+        write!(self.out, "g{id}")?;
+
+        Ok(())
+    }
 
     fn print_tys(&mut self, prefix: &str, tys: &[Ty], suffix: &str) -> io::Result<()> {
         write!(self.out, "{prefix}")?;
@@ -449,7 +520,7 @@ impl<'a, O: Write> Printer<'a, O> {
     }
     fn print_struct_ty(&mut self, ty: StructTyID) -> io::Result<()> {
         let members = &self.module[ty].members;
-        self.print_tys("{{ ", members, " }}")?;
+        self.print_tys("{ ", members, " }")?;
 
         Ok(())
     }

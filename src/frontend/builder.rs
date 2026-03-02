@@ -1,3 +1,5 @@
+use crate::frontend::global::{GlobalID, GlobalValue};
+
 use super::*;
 
 pub struct Builder {
@@ -81,6 +83,12 @@ impl Builder {
         let block = self.block.unwrap();
         self.module.add_instruction(block, instr);
     }
+    pub fn create_global(&mut self, name: Option<String>, ty: impl Into<Ty>) -> GlobalID {
+        self.module.add_global(name, ty)
+    }
+    pub fn set_global(&mut self, gid: GlobalID, value: impl Into<GlobalValue>) {
+        self.module.set_global_value(gid, value.into());
+    }
 
     pub fn set(&mut self, value: impl Into<Value>) -> RegID {
         let value = value.into();
@@ -94,6 +102,11 @@ impl Builder {
         self.add_instr(Instruction::SetFunPtr(reg, fid));
         reg
     }
+    pub fn set_global_ptr(&mut self, gid: GlobalID) -> RegID {
+        let dst = self.create_reg(Ty::Ptr);
+        self.add_instr(Instruction::SetGlobalPtr(dst, gid));
+        dst
+    }
     pub fn set_array(&mut self, elem_ty: Ty, values: impl Into<Values>) -> RegID {
         let values = values.into();
         let arr_ty = self.module.add_array_ty(values.0.len() as u64, elem_ty);
@@ -101,8 +114,10 @@ impl Builder {
         self.add_instr(Instruction::SetArray(reg, values));
         reg
     }
-    pub fn set_array_splat(&mut self, elem_ty: Ty, size: u64, value: impl Into<Value>) -> RegID {
-        let ty = self.module.add_array_ty(size, elem_ty);
+    pub fn set_array_splat(&mut self, size: u64, value: impl Into<Value>) -> RegID {
+        let value = value.into();
+        let ty = value.ty(&self.module);
+        let ty = self.module.add_array_ty(size, ty);
         let dst = self.create_reg(ty);
         self.add_instr(Instruction::SetArraySplat(dst, value.into()));
         dst
@@ -280,6 +295,11 @@ impl Builder {
     pub fn load(&mut self, ty: impl Into<Ty>, ptr: RegID) -> RegID {
         let dst = self.create_reg(ty);
         self.add_instr(Instruction::Load { dst, ptr });
+        dst
+    }
+    pub fn ptr_diff(&mut self, ret_ty: IntTy, pointee_ty: impl Into<Ty>, a: RegID, b: RegID) -> RegID {
+        let dst = self.create_reg(ret_ty);
+        self.add_instr(Instruction::PtrDiff(dst, pointee_ty.into(), a, b));
         dst
     }
 
